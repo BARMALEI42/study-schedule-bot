@@ -5,7 +5,6 @@ from typing import List, Dict, Optional
 
 
 class ScheduleDatabase:
-    # ВЫ пишете весь этот класс:
     def __init__(self, db_file: str = 'schedule.json'):
         self.db_file = db_file
         self.ensure_db_exists()
@@ -28,7 +27,7 @@ class ScheduleDatabase:
             json.dump(data, f, indent=2, ensure_ascii=False)
         return True
 
-    # CRUD операции (ВЫ пишете):
+    # CRUD операции
     def add_lesson(self, lesson_data: Dict) -> Dict:
         data = self._load_data()
         lesson_id = len(data['schedule']) + 1
