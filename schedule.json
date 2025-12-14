@@ -1,0 +1,22 @@
+{
+  "schedule": [],
+  "metadata": {
+    "created_at": "2025-12-13T20:28:10.406644",
+    "version": "1.0",
+    "total_lessons": 0,
+    "last_update": "2025-12-13T20:28:23.531517"
+  },
+  "users": {
+    "1015145052": {
+      "username": "Baraban111",
+      "first_name": "Влад",
+      "registered_at": "2025-12-13T20:28:23.531500",
+      "last_activity": "2025-12-13T20:28:23.531510",
+      "settings": {
+        "notifications": true,
+        "timezone": "UTC+3"
+      }
+    }
+  },
+  "reminders": []
+}
