@@ -7,7 +7,7 @@ from database import ScheduleDatabase
 from keyboards import create_main_menu, create_confirmation_keyboard, create_day_selection_keyboard
 from messages import (
     WELCOME_MESSAGE, HELP_MESSAGE,
-    format_schedule_message, format_error_message, format_lesson_message,
+    format_error_message, format_lesson_message,
     format_day_schedule, format_full_schedule_by_days, format_week_overview
 )
 
