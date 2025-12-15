@@ -1,14 +1,10 @@
-<<<<<<< HEAD
 
-
-=======
->>>>>>> fronted/add-commands
 import os
 from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes
 from dotenv import load_dotenv
 from database import ScheduleDatabase
-<<<<<<< HEAD
+
 
 load_dotenv()
 TOKEN = os.getenv('BOT_TOKEN')
