@@ -14,7 +14,9 @@ from messages import (
 load_dotenv()
 TOKEN = os.getenv('8598621466:AAEHM1KtekvccU8GIr0CdJS_p3KiHM5IXZc')
 db = ScheduleDatabase()
-
+if not TOKEN:
+    print("ERROR: TOKEN is empty!")
+    exit(1)
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Улучшенный старт с клавиатурой и обзором недели"""
@@ -329,10 +331,6 @@ def main():
 
 
 def main():
-    print(f"TOKEN value: {TOKEN}")  # Увидите, что там
-    if not TOKEN:
-        print("ERROR: TOKEN is empty!")
-        exit(1)
     """Основная функция запуска бота"""
     application = Application.builder().token(TOKEN).build()
 
