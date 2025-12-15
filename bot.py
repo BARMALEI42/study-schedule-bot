@@ -12,7 +12,7 @@ from messages import (
 )
 
 load_dotenv()
-TOKEN = os.getenv('BOT_TOKEN')
+TOKEN = os.getenv('8598621466:AAEHM1KtekvccU8GIr0CdJS_p3KiHM5IXZc')
 db = ScheduleDatabase()
 
 
