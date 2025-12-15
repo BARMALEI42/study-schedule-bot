@@ -10,7 +10,11 @@ from messages import (
     format_error_message, format_lesson_message,
     format_day_schedule, format_full_schedule_by_days, format_week_overview
 )
-
+import logging
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.DEBUG
+)
 load_dotenv()
 TOKEN = os.getenv('BOT_TOKEN')
 db = ScheduleDatabase()
