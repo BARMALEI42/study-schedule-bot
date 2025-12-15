@@ -329,6 +329,10 @@ def main():
 
 
 def main():
+    print(f"TOKEN value: {TOKEN}")  # Увидите, что там
+    if not TOKEN:
+        print("ERROR: TOKEN is empty!")
+        exit(1)
     """Основная функция запуска бота"""
     application = Application.builder().token(TOKEN).build()
 
