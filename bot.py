@@ -357,13 +357,7 @@ def main():
         domain = os.getenv('PYTHONANYWHERE_DOMAIN', 'www.pythonanywhere.com')
         webhook_url = f"https://{domain}/{TOKEN}"
 
-        application.run_polling(
-            listen="0.0.0.0",
-            port=8444,  # PythonAnywhere использует порт 5000
-            url_path=TOKEN,
-            webhook_url=webhook_url,
-            secret_token='WEBHOOK_SECRET'
-        )
+        application.run_polling()
     else:
         # Polling для локальной разработки
         application.run_polling()
