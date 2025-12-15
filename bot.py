@@ -345,7 +345,7 @@ def main():
 
         application.run_webhook(
             listen="0.0.0.0",
-            port=5000,  # PythonAnywhere использует порт 5000
+            port=8444,  # PythonAnywhere использует порт 5000
             url_path=TOKEN,
             webhook_url=webhook_url,
             secret_token='WEBHOOK_SECRET'
