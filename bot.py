@@ -1,61 +1,18 @@
-
 import os
 from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes
 from dotenv import load_dotenv
 from database import ScheduleDatabase
-
+from keyboards import create_main_menu, create_confirmation_keyboard
+from messages import (
+    WELCOME_MESSAGE, HELP_MESSAGE,
+    format_schedule_message, format_error_message, format_lesson_message
+)
 
 load_dotenv()
 TOKEN = os.getenv('BOT_TOKEN')
 db = ScheduleDatabase()
 
-
-async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # Базовая логика
-    await update.message.reply_text("Привет! Я бот расписания.")
-
-
-async def schedule_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # получаете данные из БД
-    lessons = db.get_all_lessons()
-    # Дальше передаёте напарнику для форматирования
-
-
-async def add_lesson_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # валидируете и сохраняете в БД
-    if not context.args or len(context.args) < 3:
-        return  # Ошибка
-
-    subject, time, day = context.args[0], context.args[1], context.args[2]
-    result = db.add_lesson({'subject': subject, 'time': time, 'day': day})
-
-
-async def delete_lesson_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    #работаете с БД
-    if context.args:
-        lesson_id = int(context.args[0])
-        db.delete_lesson(lesson_id)
-
-
-def main():
-    # настраиваете Application
-    application = Application.builder().token(TOKEN).build()
-
-    # добавляете обработчики
-    application.add_handler(CommandHandler("start", start_command))
-    application.add_handler(CommandHandler("schedule", schedule_command))
-    application.add_handler(CommandHandler("add", add_lesson_command))
-    application.add_handler(CommandHandler("delete", delete_lesson_command))
-
-    # запускаете бота
-    application.run_polling()
-=======
-from keyboards import create_main_menu, create_confirmation_keyboard
-from messages import (
-    WELCOME_MESSAGE, HELP_MESSAGE,
-    format_schedule_message, format_error_message, format_lesson_message  # Добавлена функция
-)
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Улучшенный старт с клавиатурой"""
@@ -66,17 +23,37 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=keyboard
     )
 
+
 async def schedule_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Красивое отображение расписания"""
-    # Вы получаете данные
     lessons = db.get_all_lessons()
     message = format_schedule_message(lessons)
     await update.message.reply_text(message, parse_mode='Markdown')
 
+
+async def add_lesson_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Добавление урока"""
+    if not context.args or len(context.args) < 3:
+        await update.message.reply_text(
+            "Используйте: /add <предмет> <время> <день>\nПример: /add Математика 10:00 Понедельник",
+            parse_mode='Markdown'
+        )
+        return
+
+    subject, time, day = context.args[0], context.args[1], context.args[2]
+    result = db.add_lesson({'subject': subject, 'time': time, 'day': day})
+
+    if result:
+        await update.message.reply_text(f"✅ Урок '{subject}' добавлен на {day} в {time}")
+    else:
+        await update.message.reply_text("❌ Ошибка при добавлении урока")
+
+
 async def delete_lesson_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Удаление урока с подтверждением"""
     if not context.args:
         await update.message.reply_text(
-            "Укажите ID урока для удаления. Пример: /delete_lesson 1",
+            "Укажите ID урока для удаления. Пример: /delete 1",
             parse_mode='Markdown'
         )
         return
@@ -104,4 +81,31 @@ async def delete_lesson_command(update: Update, context: ContextTypes.DEFAULT_TY
         )
     except ValueError:
         await update.message.reply_text(format_error_message('time_format'))
->>>>>>> fronted/add-commands
+
+
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Команда помощи"""
+    await update.message.reply_text(
+        HELP_MESSAGE,
+        parse_mode='Markdown'
+    )
+
+
+def main():
+    """Основная функция запуска бота"""
+    application = Application.builder().token(TOKEN).build()
+
+    # Добавляем обработчики команд
+    application.add_handler(CommandHandler("start", start_command))
+    application.add_handler(CommandHandler("schedule", schedule_command))
+    application.add_handler(CommandHandler("add", add_lesson_command))
+    application.add_handler(CommandHandler("delete", delete_lesson_command))
+    application.add_handler(CommandHandler("help", help_command))
+
+    # Запускаем бота
+    print("Бот запущен...")
+    application.run_polling()
+
+
+if __name__ == "__main__":
+    main()
