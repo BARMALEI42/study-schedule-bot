@@ -14,8 +14,20 @@ from messages import (
 load_dotenv()
 TOKEN = os.getenv('8598621466:AAEHM1KtekvccU8GIr0CdJS_p3KiHM5IXZc')
 db = ScheduleDatabase()
+print("=== DEBUG INFO ===")
+print(f"Current directory: {os.getcwd()}")
+print(f".env file exists: {os.path.exists('.env')}")
+print(f"TELEGRAM_TOKEN from env: '{TOKEN}'")
+print(f"Token type: {type(TOKEN)}")
+print(f"Token length: {len(TOKEN) if TOKEN else 0}")
+print(f"All environment variables starting with 'TELEGRAM':")
+for key, value in os.environ.items():
+    if 'TELEGRAM' in key.upper() or 'TOKEN' in key.upper():
+        print(f"  {key}: '{value}'")
+print("==================")
+
 if not TOKEN:
-    print("ERROR: TOKEN is empty!")
+    print("ERROR: TELEGRAM_TOKEN is empty or None!")
     exit(1)
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
