@@ -357,7 +357,7 @@ def main():
         domain = os.getenv('PYTHONANYWHERE_DOMAIN', 'www.pythonanywhere.com')
         webhook_url = f"https://{domain}/{TOKEN}"
 
-        application.run_webhook(
+        application.run_polling(
             listen="0.0.0.0",
             port=8444,  # PythonAnywhere использует порт 5000
             url_path=TOKEN,
