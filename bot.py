@@ -339,28 +339,22 @@ def main():
 
     # Запускаем бота
     print("Бот запущен...")
-    application.run_polling()
-
-
-def main():
-    """Основная функция запуска бота"""
-    application = Application.builder().token(TOKEN).build()
-
-    # ... все ваши обработчики ...
-
-    # Запускаем бота
-    print("Бот запущен...")
 
     # Для PythonAnywhere используем webhook
     if os.getenv('PYTHONANYWHERE_DOMAIN'):
         # Webhook для продакшена
         domain = os.getenv('PYTHONANYWHERE_DOMAIN', 'www.pythonanywhere.com')
         webhook_url = f"https://{domain}/{TOKEN}"
-
-        application.run_polling()
+        application.run_webhook(
+            listen='0.0.0.0',
+            port=8443,
+            webhook_url=webhook_url,
+            url_path=TOKEN
+        )
     else:
         # Polling для локальной разработки
         application.run_polling()
+
 
 if __name__ == "__main__":
     main()
