@@ -12,7 +12,7 @@ from messages import (
 )
 
 load_dotenv()
-TOKEN = os.getenv('8598621466:AAEHM1KtekvccU8GIr0CdJS_p3KiHM5IXZc')
+TOKEN = os.getenv('TELEGRAM_TOKEN')
 db = ScheduleDatabase()
 print("=== DEBUG INFO ===")
 print(f"Current directory: {os.getcwd()}")
