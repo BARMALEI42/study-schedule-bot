@@ -1,1 +1,27 @@
+# Python кэш
+__pycache__/
+*.py[cod]
+
+# Виртуальное окружение
+venv/
 .env
+.venv
+
+# Секреты
+.env
+.env.local
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Логи
+*.log
+
+# Временные файлы
+*.tmp
+*.temp
