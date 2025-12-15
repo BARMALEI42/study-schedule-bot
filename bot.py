@@ -1,3 +1,8 @@
+import os
+from telegram import Update
+from telegram.ext import Application, CommandHandler, ContextTypes
+from dotenv import load_dotenv
+from database import ScheduleDatabase
 from keyboards import create_main_menu, create_confirmation_keyboard
 from messages import (
     WELCOME_MESSAGE, HELP_MESSAGE,
