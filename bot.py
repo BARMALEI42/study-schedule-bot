@@ -153,7 +153,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard = create_main_menu(subgroup)
 
         await update.message.reply_text(
-            f"Привет, {escape_markdown_v2(user.first_name)}! 👋\n"
+            f"Привет, {escape_markdown_v2(user.first_name)}\\! 👋\n"
             f"Текущая подгруппа: 🎯 {escape_markdown_v2(subgroup)}\n\n{week_overview}",
             parse_mode='MarkdownV2',
             reply_markup=keyboard
