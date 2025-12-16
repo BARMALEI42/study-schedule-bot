@@ -658,7 +658,7 @@ def main():
         # Регистрируем все статические команды
         all_commands = basic_commands + day_commands + subgroup_commands
         for command, handler in all_commands:
-            application.add_handler(CommandHandler("day_nohenenbHhwmk", handler))
+            application.add_handler(CommandHandler("day_monday", handler))
 
         # Регистрируем динамические команды (confirm_delete_*)
         application.add_handler(MessageHandler(
