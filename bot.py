@@ -1,6 +1,7 @@
 import os
 import datetime
 import logging
+import re
 from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes, CallbackQueryHandler
 from dotenv import load_dotenv
@@ -17,7 +18,7 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("telegram").setLevel(logging.WARNING)
 logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s',
-    level=logging.INFO,  # Изменил на INFO для лучшей отладки
+    level=logging.INFO,
     datefmt='%H:%M:%S'
 )
 
@@ -48,6 +49,19 @@ user_subgroups = {}
 
 
 # === УТИЛИТНЫЕ ФУНКЦИИ ===
+def escape_markdown_v2(text: str) -> str:
+    """Экранирует специальные символы для MarkdownV2"""
+    escape_chars = r'_*[]()~`>#+-=|{}.!'
+    for char in escape_chars:
+        text = text.replace(char, f'\\{char}')
+    return text
+
+
+def safe_markdown_bold(text: str) -> str:
+    """Возвращает текст в жирном начертании с экранированием"""
+    return f"*{escape_markdown_v2(text)}*"
+
+
 def get_cached_schedule(subgroup: str = 'all'):
     """Кэшируем расписание для каждой подгруппы отдельно"""
     global _schedule_cache, _cache_timestamp
@@ -131,11 +145,11 @@ async def get_day_schedule_message(day_ru: str, subgroup: str, day_type: str = "
     lessons = cached_data.get(day_ru, [])
 
     if lessons:
-        message = f"📅 *{day_ru}* (подгруппа {subgroup}):\n\n"
+        message = f"📅 {safe_markdown_bold(day_ru)} (подгруппа {escape_markdown_v2(subgroup)}):\n\n"
         for lesson in lessons:
-            message += f"• {lesson['time']} - {lesson['subject']}{format_subgroup_mark(lesson.get('subgroup'))}\n"
+            message += f"• {lesson['time']} - {escape_markdown_v2(lesson['subject'])}{format_subgroup_mark(lesson.get('subgroup'))}\n"
     else:
-        message = f"🎉 *{day_ru}*\n{day_type.capitalize()} нет уроков для подгруппы {subgroup}!"
+        message = f"🎉 {safe_markdown_bold(day_ru)}\n{day_type.capitalize()} нет уроков для подгруппы {escape_markdown_v2(subgroup)}!"
 
     return message
 
@@ -154,9 +168,9 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = create_main_menu(subgroup)
 
     await update.message.reply_text(
-        f"Привет, {user.first_name}! 👋\n"
-        f"Текущая подгруппа: 🎯 {subgroup}\n\n{week_overview}",
-        parse_mode='Markdown',
+        f"Привет, {escape_markdown_v2(user.first_name)}! 👋\n"
+        f"Текущая подгруппа: 🎯 {escape_markdown_v2(subgroup)}\n\n{week_overview}",
+        parse_mode='MarkdownV2',
         reply_markup=keyboard
     )
 
@@ -172,7 +186,7 @@ async def subgroup_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "• Подгруппа 1 - ваши индивидуальные уроки\n"
         "• Подгруппа 2 - уроки для второй подгруппы\n"
         "• Для всех - общие уроки",
-        parse_mode='Markdown',
+        parse_mode='MarkdownV2',
         reply_markup=keyboard
     )
 
@@ -184,7 +198,7 @@ async def schedule_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     keyboard = create_day_selection_keyboard(subgroup)
     await update.message.reply_text(
-        f"📅 Выберите день (подгруппа {subgroup}):",
+        f"📅 Выберите день (подгруппа {escape_markdown_v2(subgroup)}):",
         reply_markup=keyboard
     )
 
@@ -198,7 +212,7 @@ async def today_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     today_ru = DAYS_RU[today_idx]
 
     message = await get_day_schedule_message(today_ru, subgroup, "сегодня")
-    await update.message.reply_text(message, parse_mode='Markdown')
+    await update.message.reply_text(message, parse_mode='MarkdownV2')
 
 
 async def tomorrow_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -210,7 +224,7 @@ async def tomorrow_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     tomorrow_ru = DAYS_RU[tomorrow_idx]
 
     message = await get_day_schedule_message(tomorrow_ru, subgroup, "завтра")
-    await update.message.reply_text(message, parse_mode='Markdown')
+    await update.message.reply_text(message, parse_mode='MarkdownV2')
 
 
 async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -226,8 +240,8 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             set_user_subgroup(user_id, subgroup)
             keyboard = create_main_menu(subgroup)
             await query.edit_message_text(
-                text=f"✅ Выбрана подгруппа: 🎯 {subgroup}\n\nТеперь вы будете видеть уроки для этой подгруппы.",
-                parse_mode='Markdown',
+                text=f"✅ Выбрана подгруппа: 🎯 {escape_markdown_v2(subgroup)}\n\nТеперь вы будете видеть уроки для этой подгруппы\.",
+                parse_mode='MarkdownV2',
                 reply_markup=keyboard
             )
         return
@@ -242,20 +256,20 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 success = db.delete_lesson(lesson_id)
                 if success:
                     clear_schedule_cache()
-                    message = f"✅ Урок удален!\n\n"
-                    message += f"• Предмет: {lesson.get('subject', 'Неизвестно')}\n"
+                    message = f"✅ Урок удален\!\n\n"
+                    message += f"• Предмет: {escape_markdown_v2(lesson.get('subject', 'Неизвестно'))}\n"
                     if lesson.get('subgroup') != 'all':
-                        message += f"• Подгруппа: {lesson.get('subgroup')}\n"
-                    message += f"• Время: {lesson.get('time', 'Неизвестно')}\n"
-                    message += f"• День: {lesson.get('day', 'Неизвестно')}"
+                        message += f"• Подгруппа: {escape_markdown_v2(lesson.get('subgroup'))}\n"
+                    message += f"• Время: {escape_markdown_v2(lesson.get('time', 'Неизвестно'))}\n"
+                    message += f"• День: {escape_markdown_v2(lesson.get('day', 'Неизвестно'))}"
                 else:
                     message = "❌ Ошибка при удалении урока"
             else:
                 message = "❌ Урок не найден"
 
-            await query.edit_message_text(text=message, parse_mode='Markdown')
+            await query.edit_message_text(text=message, parse_mode='MarkdownV2')
         except (ValueError, IndexError):
-            await query.edit_message_text("❌ Ошибка: некорректный ID урока", parse_mode='Markdown')
+            await query.edit_message_text("❌ Ошибка: некорректный ID урока", parse_mode='MarkdownV2')
         return
 
     # Обработка кнопок выбора дня
@@ -269,13 +283,13 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             if day == 'Вся неделя':
                 message = format_full_schedule_by_days(cached_data)
-                message += f"\n\n🎯 *Подгруппа: {subgroup}*"
+                message += f"\n\n🎯 *Подгруппа: {escape_markdown_v2(subgroup)}*"
             else:
                 lessons = cached_data.get(day, [])
                 message = format_day_schedule(day, lessons)
-                message += f"\n\n🎯 *Подгруппа: {subgroup}*"
+                message += f"\n\n🎯 *Подгруппа: {escape_markdown_v2(subgroup)}*"
 
-            await query.edit_message_text(text=message, parse_mode='Markdown')
+            await query.edit_message_text(text=message, parse_mode='MarkdownV2')
         return
 
     # Обработка кнопки смены подгруппы
@@ -284,7 +298,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard = create_subgroup_selection_keyboard(current_subgroup)
         await query.edit_message_text(
             text="🎯 *Выберите подгруппу:*",
-            parse_mode='Markdown',
+            parse_mode='MarkdownV2',
             reply_markup=keyboard
         )
         return
@@ -293,7 +307,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if query.data in ['cancel_delete', 'cancel', 'cancel_subgroup']:
         await query.edit_message_text(
             text="❌ Действие отменено",
-            parse_mode='Markdown'
+            parse_mode='MarkdownV2'
         )
 
 
@@ -301,14 +315,14 @@ async def add_lesson_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
     """Добавить урок: /add <предмет> <время> <день> [подгруппа]"""
     if not context.args or len(context.args) < 3:
         await update.message.reply_text(
-            "📝 *Формат:* `/add <предмет> <время> <день> [подгруппа]`\n\n"
+            "📝 *Формат:* `/add <предмет> <время> <день> \[подгруппа\]`\n\n"
             "📌 *Примеры:*\n"
-            "• `/add Математика 10:00 Понедельник` - для всех\n"
-            "• `/add Математика 10:00 Понедельник 1` - для подгруппы 1\n"
-            "• `/add Математика 10:00 Понедельник 2` - для подгруппы 2\n"
-            "• `/add Математика 10:00 Понедельник all` - для всех подгрупп\n\n"
+            "• `/add Математика 10:00 Понедельник` \- для всех\n"
+            "• `/add Математика 10:00 Понедельник 1` \- для подгруппы 1\n"
+            "• `/add Математика 10:00 Понедельник 2` \- для подгруппы 2\n"
+            "• `/add Математика 10:00 Понедельник all` \- для всех подгрупп\n\n"
             "⚠️ *Подгруппа по умолчанию:* `all`",
-            parse_mode='Markdown'
+            parse_mode='MarkdownV2'
         )
         return
 
@@ -317,8 +331,8 @@ async def add_lesson_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     if subgroup not in VALID_SUBGROUPS:
         await update.message.reply_text(
-            "❌ Некорректная подгруппа. Используйте: `1`, `2` или `all`",
-            parse_mode='Markdown'
+            "❌ Некорректная подгруппа\. Используйте: `1`, `2` или `all`",
+            parse_mode='MarkdownV2'
         )
         return
 
@@ -333,7 +347,7 @@ async def add_lesson_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     if result.get('success'):
         clear_schedule_cache(subgroup)
-        subgroup_text = f" (подгруппа {subgroup})" if subgroup != 'all' else " (для всех)"
+        subgroup_text = f" \(подгруппа {subgroup}\)" if subgroup != 'all' else " \(для всех\)"
         await update.message.reply_text(f"✅ '{subject}' добавлен на {day} в {time}{subgroup_text}")
     else:
         await update.message.reply_text("❌ Ошибка при добавлении урока")
@@ -342,7 +356,7 @@ async def add_lesson_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
 async def delete_lesson_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Удалить урок: /delete <id>"""
     if not context.args:
-        await update.message.reply_text("Укажите ID урока: `/delete 1`", parse_mode='Markdown')
+        await update.message.reply_text("Укажите ID урока: `/delete 1`", parse_mode='MarkdownV2')
         return
 
     try:
@@ -355,20 +369,20 @@ async def delete_lesson_command(update: Update, context: ContextTypes.DEFAULT_TY
 
         keyboard = create_confirmation_keyboard(lesson_id)
         message = f"🗑️ *Удалить урок?*\n\n"
-        message += f"• Предмет: {lesson.get('subject', 'Неизвестно')}\n"
-        message += f"• Время: {lesson.get('time', 'Неизвестно')}\n"
-        message += f"• День: {lesson.get('day', 'Неизвестно')}\n"
+        message += f"• Предмет: {escape_markdown_v2(lesson.get('subject', 'Неизвестно'))}\n"
+        message += f"• Время: {escape_markdown_v2(lesson.get('time', 'Неизвестно'))}\n"
+        message += f"• День: {escape_markdown_v2(lesson.get('day', 'Неизвестно'))}\n"
         if lesson.get('subgroup') != 'all':
-            message += f"• Подгруппа: {lesson.get('subgroup')}\n"
-        message += f"• ID: {lesson.get('id', 'Неизвестно')}"
+            message += f"• Подгруппа: {escape_markdown_v2(lesson.get('subgroup'))}\n"
+        message += f"• ID: {escape_markdown_v2(str(lesson.get('id', 'Неизвестно')))}"
 
         await update.message.reply_text(
             message,
-            parse_mode='Markdown',
+            parse_mode='MarkdownV2',
             reply_markup=keyboard
         )
     except ValueError:
-        await update.message.reply_text("❌ Введите правильный ID (число)")
+        await update.message.reply_text("❌ Введите правильный ID \(число\)", parse_mode='MarkdownV2')
 
 
 async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -378,20 +392,20 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     stats = db.get_stats_for_subgroup(subgroup)
 
-    message = f"📊 *Статистика (подгруппа {subgroup}):*\n\n"
-    message += f"• Всего уроков: *{stats['total_lessons']}*\n"
-    message += f"• Дней с уроками: *{stats['days_with_lessons']}*\n"
-    message += f"• Разных предметов: *{stats['subjects_count']}*\n"
+    message = f"📊 *Статистика \(подгруппа {escape_markdown_v2(subgroup)}\):*\n\n"
+    message += f"• Всего уроков: *{escape_markdown_v2(str(stats['total_lessons']))}*\n"
+    message += f"• Дней с уроками: *{escape_markdown_v2(str(stats['days_with_lessons']))}*\n"
+    message += f"• Разных предметов: *{escape_markdown_v2(str(stats['subjects_count']))}*\n"
 
     if stats.get('most_busy_day'):
-        message += f"• Самый загруженный день: *{stats['most_busy_day']}*\n"
+        message += f"• Самый загруженный день: *{escape_markdown_v2(stats['most_busy_day'])}*\n"
 
     if stats.get('lessons_by_day'):
         message += f"\n📅 *Уроков по дням:*\n"
         for day, count in stats['lessons_by_day'].items():
-            message += f"• {day}: {count}\n"
+            message += f"• {escape_markdown_v2(day)}: {escape_markdown_v2(str(count))}\n"
 
-    await update.message.reply_text(message, parse_mode='Markdown')
+    await update.message.reply_text(message, parse_mode='MarkdownV2')
 
 
 async def week_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -401,9 +415,9 @@ async def week_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     cached_data = get_cached_schedule(subgroup)
     message = format_full_schedule_by_days(cached_data)
-    message += f"\n\n🎯 *Подгруппа: {subgroup}*"
+    message += f"\n\n🎯 *Подгруппа: {escape_markdown_v2(subgroup)}*"
 
-    await update.message.reply_text(message, parse_mode='Markdown')
+    await update.message.reply_text(message, parse_mode='MarkdownV2')
 
 
 async def all_lessons_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -435,24 +449,24 @@ async def all_lessons_command(update: Update, context: ContextTypes.DEFAULT_TYPE
             subgroup = lesson.get('subgroup', 'all')
 
             if day != current_day:
-                result += f"\n*{day.upper()}*\n"
+                result += f"\n{safe_markdown_bold(day.upper())}\n"
                 current_day = day
 
-            result += f"🕒 {time} - {subject} {format_subgroup_text(subgroup)}\n"
+            result += f"🕒 {escape_markdown_v2(time)} \- {escape_markdown_v2(subject)} {format_subgroup_text(subgroup)}\n"
 
-        result += f"\n📊 Всего уроков в базе: *{len(all_lessons)}*"
-        await update.message.reply_text(result, parse_mode='Markdown')
+        result += f"\n📊 Всего уроков в базе: {safe_markdown_bold(str(len(all_lessons)))}"
+        await update.message.reply_text(result, parse_mode='MarkdownV2')
 
     except AttributeError as e:
         logging.error(f"Ошибка в all_lessons_command: {e}")
         await update.message.reply_text(
-            "❌ Ошибка: метод get_all_lessons() не найден в базе данных.\n"
-            "Проверьте файл database.py",
-            parse_mode='Markdown'
+            "❌ Ошибка: метод get\_all\_lessons\(\) не найден в базе данных\.\n"
+            "Проверьте файл database\.py",
+            parse_mode='MarkdownV2'
         )
     except Exception as e:
         logging.error(f"Ошибка в all_lessons_command: {e}")
-        await update.message.reply_text(f"❌ Ошибка при получении уроков: {str(e)}")
+        await update.message.reply_text(f"❌ Ошибка при получении уроков: {escape_markdown_v2(str(e))}", parse_mode='MarkdownV2')
 
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -461,24 +475,24 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             HELP_MESSAGE +
             "\n\n🎯 *Работа с подгруппами:*\n"
             "• Используйте команду `/subgroup` для выбора подгруппы\n"
-            "• Подгруппа `1` - ваши индивидуальные уроки\n"
-            "• Подгруппа `2` - уроки для второй подгруппы\n"
-            "• `all` - общие уроки для всех\n\n"
+            "• Подгруппа `1` \- ваши индивидуальные уроки\n"
+            "• Подгруппа `2` \- уроки для второй подгруппы\n"
+            "• `all` \- общие уроки для всех\n\n"
             "📝 *Добавление урока с подгруппой:*\n"
-            "`/add Математика 10:00 Понедельник 1` - для подгруппы 1\n"
-            "`/add Математика 10:00 Понедельник 2` - для подгруппы 2\n"
-            "`/add Математика 10:00 Понедельник all` - для всех\n\n"
+            "`/add Математика 10:00 Понедельник 1` \- для подгруппы 1\n"
+            "`/add Математика 10:00 Понедельник 2` \- для подгруппы 2\n"
+            "`/add Математика 10:00 Понедельник all` \- для всех\n\n"
             "📊 *Просмотр статистики:* `/stats`\n"
             "📅 *Вся неделя:* `/week`\n"
             "📚 *Все уроки:* `/all`"
     )
-    await update.message.reply_text(help_text, parse_mode='Markdown')
+    await update.message.reply_text(help_text, parse_mode='MarkdownV2')
 
 
 async def clear_cache_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Очистка кэша: /clearcache"""
     clear_schedule_cache()
-    await update.message.reply_text("✅ Кэш расписания очищен")
+    await update.message.reply_text("✅ Кэш расписания очищен", parse_mode='MarkdownV2')
 
 
 def main():
