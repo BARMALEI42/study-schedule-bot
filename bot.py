@@ -594,9 +594,66 @@ async def dynamic_day_command(update: Update, context: ContextTypes.DEFAULT_TYPE
         await update.message.reply_text(f"❌ Ошибка: {str(e)[:100]}")
 
 
+# === ОБРАБОТЧИК ТЕКСТОВЫХ СООБЩЕНИЙ (для кнопок клавиатуры) ===
+async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработчик текстовых сообщений от кнопок клавиатуры"""
+    try:
+        text = update.message.text.lower()
+        user_id = update.effective_user.id
+
+        if "сегодня" in text:
+            await today_command(update, context)
+        elif "завтра" in text:
+            await tomorrow_command(update, context)
+        elif "вся неделя" in text or "неделя" in text:
+            await week_command(update, context)
+        elif "добавить урок" in text:
+            await update.message.reply_text(
+                "📝 Для добавления урока используйте команду:\n"
+                "`/add <предмет> <время> <день> [подгруппа]`\n\n"
+                "Пример: `/add Математика 10:00 Понедельник 1`",
+                parse_mode='MarkdownV2'
+            )
+        elif "удалить урок" in text:
+            await update.message.reply_text(
+                "🗑️ Для удаления урока используйте команду:\n"
+                "`/delete <ID_урока>`\n\n"
+                "Сначала посмотрите ID урока: `/all`",
+                parse_mode='MarkdownV2'
+            )
+        elif "статистика" in text:
+            await update.message.reply_text(
+                "📊 Статистика в разработке...\n"
+                "Пока используйте `/all` чтобы увидеть все уроки"
+            )
+        elif "помощь" in text or "❓" in text:
+            await help_command(update, context)
+        elif "подгруппа" in text:
+            await subgroup_command(update, context)
+        else:
+            # Если текст не распознан, покажем подсказку
+            await update.message.reply_text(
+                "ℹ️ Используйте кнопки ниже или команды:\n"
+                "`/start` - начать\n"
+                "`/help` - помощь\n"
+                "`/today` - сегодня",
+                parse_mode='MarkdownV2'
+            )
+
+    except Exception as e:
+        print(f"❌ Ошибка в обработке текста: {e}")
+        import traceback
+        traceback.print_exc()
+
+
 def main():
     """Запуск бота"""
+    application.add_handler(MessageHandler(
+        filters.TEXT & ~filters.COMMAND,  # Все текстовые сообщения, кроме команд
+        handle_text_message
+    ))
     try:
+
         print("🚀 Запуск бота с поддержкой подгрупп...")
         print(f"📱 Токен: {TOKEN[:10]}...")
 
@@ -639,7 +696,7 @@ def main():
 
         # Регистрация команд ДНЕЙ
         day_commands = [
-            ("day_monday", day_monday_command),  
+            ("day_monday", day_monday_command),
             ("day_tuesday", day_tuesday_command),
             ("day_wednesday", day_wednesday_command),
             ("day_thursday", day_thursday_command),
