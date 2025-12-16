@@ -406,7 +406,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "📊 *Просмотр статистики:* `/stats`\n"
             "📅 *Вся неделя:* `/week`"
     )
-    await update.message.reply_text(help_text, parse_mode='Markdown')
+    await update.message.reply_text(help_text)
 
 
 async def clear_cache_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
