@@ -65,20 +65,6 @@ def create_simple_days_keyboard() -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
 
-async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Помощь: /help - показывает все команды"""
-    help_text = (
-        "🆘 *СПРАВКА ПО КОМАНДАМ*\n\n"
-
-        "🔄 *КНОПКИ ПОД КЛАВИАТУРОЙ:*\n"
-        "Просто нажмите на нужную кнопку:\n"
-        "• 'Сегодня' - расписание на сегодня\n"
-        "• 'Завтра' - расписание на завтра\n"
-        "• 'Вся неделя' - вся неделя\n"
-        "и т.д.\n\n"
-
-        # ... остальной текст ...
-    )
 def create_simple_subgroups_keyboard() -> ReplyKeyboardMarkup:
     """Простая клавиатура с подгруппами"""
     keyboard = [
