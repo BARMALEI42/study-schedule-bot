@@ -390,6 +390,58 @@ async def week_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(message, parse_mode='Markdown')
 
 
+async def all_lessons_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Вывод всех уроков подряд: /all или /все"""
+    try:
+        user_id = update.effective_user.id
+
+        # Получаем все уроки из БД
+        all_lessons = db.get_all_lessons()
+
+        if not all_lessons:
+            await update.message.reply_text("📭 В базе данных нет уроков")
+            return
+
+        # Сортируем уроки по дню и времени
+        days_order = ["Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота"]
+        all_lessons.sort(key=lambda x: (
+            days_order.index(x["day"]) if x["day"] in days_order else 999,
+            x["time"]
+        ))
+
+        # Формируем текст
+        result = "📚 *Все уроки в базе данных:*\n\n"
+        current_day = None
+
+        for lesson in all_lessons:
+            # Определяем подгруппу
+            subgroup = lesson.get('subgroup', 'all')
+            if subgroup == 'all':
+                subgroup_text = "👥 (для всех)"
+            elif subgroup == '1':
+                subgroup_text = "1️⃣ (подгруппа 1)"
+            elif subgroup == '2':
+                subgroup_text = "2️⃣ (подгруппа 2)"
+            else:
+                subgroup_text = f"({subgroup})"
+
+            # Добавляем заголовок дня, если он изменился
+            if lesson['day'] != current_day:
+                result += f"\n*{lesson['day'].upper()}*\n"
+                current_day = lesson['day']
+
+            # Добавляем урок
+            result += f"🕒 {lesson['time']} - {lesson['subject']} {subgroup_text}\n"
+
+        # Добавляем статистику
+        result += f"\n📊 Всего уроков в базе: *{len(all_lessons)}*"
+
+        await update.message.reply_text(result, parse_mode='Markdown')
+
+    except Exception as e:
+        logging.error(f"Ошибка в all_lessons_command: {e}")
+        await update.message.reply_text(f"❌ Ошибка при получении уроков: {str(e)}")
+
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Помощь: /help"""
     help_text = (
@@ -433,6 +485,7 @@ def main():
     application.add_handler(CommandHandler("tomorrow", tomorrow_command))
     application.add_handler(CommandHandler("schedule", schedule_command))
     application.add_handler(CommandHandler("week", week_command))
+    application.add_handler(CommandHandler("all", all_lessons_command))
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CommandHandler("add", add_lesson_command))
     application.add_handler(CommandHandler("delete", delete_lesson_command))
