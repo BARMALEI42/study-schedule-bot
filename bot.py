@@ -466,6 +466,20 @@ async def clear_cache_command(update: Update, context: ContextTypes.DEFAULT_TYPE
     clear_schedule_cache()
     await update.message.reply_text("✅ Кэш расписания очищен", parse_mode='MarkdownV2')
 
+from telegram.ext import CommandHandler
+
+async def start(update, context):
+    try:
+        # Ваш код обработки команды /start
+        await update.message.reply_text("Привет! Я бот.")
+    except Exception as e:
+        print(f"Ошибка в команде /start: {e}")
+        import traceback
+        traceback.print_exc()
+        # Можно отправить пользователю сообщение об ошибке
+        await update.message.reply_text("Произошла ошибка. Попробуйте позже.")
+
+application.add_handler(CommandHandler("start", start))
 
 def main():
     """Запуск бота"""
