@@ -502,4 +502,31 @@ def format_success_message(action: str, details: str = "", subgroup: str = None)
         'subgroup_changed': f"✅ Подгруппа изменена\!\n{safe_details}"
     }
 
-    message = messages.get(action, f"✅ Действие выполнено успешно\!\n{safe
+    message = messages.get(action, f"✅ Действие выполнено успешно\!\n{safe_details}")
+
+    # Добавить информацию о подгруппе
+    if subgroup and action in ['add', 'subgroup_changed']:
+        subgroup_text = SUBGROUP_TEXTS.get(subgroup, f'подгруппа {escape_markdown_v2(subgroup)}')
+        if action == 'add':
+            message += f"\n\n{subgroup_text}"
+        elif action == 'subgroup_changed':
+            message = message.replace("изменена", f"изменена на {subgroup_text}")
+
+    return message
+
+
+def format_error_message(error_type: str, details: str = "") -> str:
+    """Сообщение об ошибке"""
+    safe_details = escape_markdown_v2(details)
+
+    errors = {
+        'time_format': f"❌ Неверный формат времени\!\nИспользуйте ЧЧ:ММ \(например: 10:30\)\n{safe_details}",
+        'missing_args': f"❌ Недостаточно аргументов\!\n{safe_details}",
+        'lesson_not_found': f"❌ Урок не найден\!\n{safe_details}",
+        'db_error': f"❌ Ошибка базы данных\!\n{safe_details}",
+        'invalid_day': f"❌ Неверный день недели\!\nИспользуйте: Понедельник, Вторник и т\.д\.\n{safe_details}",
+        'no_lessons': f"❌ Нет уроков для отображения\!\n{safe_details}",
+        'invalid_subgroup': f"❌ Неверная подгруппа\!\nИспользуйте: 1, 2 или all\n{safe_details}",
+        'unknown': f"❌ Произошла неизвестная ошибка\!\n{safe_details}"
+    }
+    return errors.get(error_type, errors['unknown'])
