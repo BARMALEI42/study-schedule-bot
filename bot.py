@@ -146,7 +146,38 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
-    if query.data.startswith('day_'):
+    # === ОБРАБОТКА КНОПОК УДАЛЕНИЯ ===
+    if query.data.startswith('confirm_delete_'):
+        try:
+            # Извлекаем ID урока из callback_data
+            # callback_data имеет формат: "confirm_delete_123" (где 123 - ID урока)
+            lesson_id = int(query.data.split('_')[-1])
+
+            # Получаем сам урок для информации
+            lesson = db.get_lesson_by_id(lesson_id)
+
+            if lesson:
+                # Удаляем урок из базы
+                success = db.delete_lesson(lesson_id)
+
+                if success:
+                    clear_schedule_cache()  # Очищаем кэш
+                    message = f"✅ Урок удален!\n\n"
+                    message += f"• Предмет: {lesson.get('subject', 'Неизвестно')}\n"
+                    message += f"• Время: {lesson.get('time', 'Неизвестно')}\n"
+                    message += f"• День: {lesson.get('day', 'Неизвестно')}"
+                else:
+                    message = "❌ Ошибка при удалении урока"
+            else:
+                message = "❌ Урок не найден"
+
+        except (ValueError, IndexError):
+            message = "❌ Ошибка: некорректный ID урока"
+
+        await query.edit_message_text(text=message, parse_mode='Markdown')
+
+    # === ОБРАБОТКА КНОПОК ВЫБОРА ДНЯ ===
+    elif query.data.startswith('day_'):
         day = query.data[4:]
 
         cached_data = get_cached_schedule()
@@ -158,6 +189,20 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             message = format_day_schedule(day, lessons)
 
         await query.edit_message_text(text=message, parse_mode='Markdown')
+
+    # === ОБРАБОТКА КНОПКИ ОТМЕНЫ УДАЛЕНИЯ ===
+    elif query.data == 'cancel_delete':
+        await query.edit_message_text(
+            text="❌ Удаление отменено",
+            parse_mode='Markdown'
+        )
+
+    # === ОБРАБОТКА ПРОЧИХ КНОПОК (если есть) ===
+    elif query.data == 'cancel':
+        await query.edit_message_text(
+            text="❌ Действие отменено",
+            parse_mode='Markdown'
+        )
 
 
 async def add_lesson_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -193,13 +238,19 @@ async def delete_lesson_command(update: Update, context: ContextTypes.DEFAULT_TY
             return
 
         keyboard = create_confirmation_keyboard(lesson_id)
+        message = f"🗑️ *Удалить урок?*\n\n"
+        message += f"• Предмет: {lesson.get('subject', 'Неизвестно')}\n"
+        message += f"• Время: {lesson.get('time', 'Неизвестно')}\n"
+        message += f"• День: {lesson.get('day', 'Неизвестно')}\n"
+        message += f"• ID: {lesson.get('id', 'Неизвестно')}"
+
         await update.message.reply_text(
-            f"Удалить:\n{format_lesson_message(lesson)}",
+            message,
             parse_mode='Markdown',
             reply_markup=keyboard
         )
     except ValueError:
-        await update.message.reply_text("❌ Введите число")
+        await update.message.reply_text("❌ Введите правильный ID (число)")
 
 
 async def clear_cache_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -249,6 +300,7 @@ def main():
         print("\n👋 Бот остановлен")
     except Exception as e:
         logging.error(f"Ошибка: {e}")
+
 
 if __name__ == "__main__":
     main()
