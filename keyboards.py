@@ -1,8 +1,8 @@
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, KeyboardButton
 
 
-def create_main_menu() -> ReplyKeyboardMarkup:
-    """Главное меню бота (Reply-клавиатура для быстрого доступа)"""
+def create_main_menu(subgroup: str = '1') -> ReplyKeyboardMarkup:
+    """Главное меню бота с указанием подгруппы"""
     menu = [
         [
             KeyboardButton("📅 Сегодня"),
@@ -17,52 +17,83 @@ def create_main_menu() -> ReplyKeyboardMarkup:
             KeyboardButton("📊 Статистика")
         ],
         [
+            KeyboardButton(f"🎯 Подгруппа {subgroup}"),
             KeyboardButton("❓ Помощь")
         ]
     ]
     return ReplyKeyboardMarkup(menu, resize_keyboard=True, one_time_keyboard=False)
 
 
-def create_day_selection_keyboard() -> InlineKeyboardMarkup:
-    """Inline-клавиатура для выбора дня недели"""
+def create_subgroup_selection_keyboard(current_subgroup: str = '1') -> InlineKeyboardMarkup:
+    """Выбор подгруппы"""
     keyboard = [
         [
-            InlineKeyboardButton("Понедельник", callback_data="day_Понедельник"),
-            InlineKeyboardButton("Вторник", callback_data="day_Вторник")
+            InlineKeyboardButton(
+                "🎯 Подгруппа 1" + (" ✅" if current_subgroup == '1' else ""),
+                callback_data="subgroup_1"
+            ),
+            InlineKeyboardButton(
+                "🎯 Подгруппа 2" + (" ✅" if current_subgroup == '2' else ""),
+                callback_data="subgroup_2"
+            )
         ],
         [
-            InlineKeyboardButton("Среда", callback_data="day_Среда"),
-            InlineKeyboardButton("Четверг", callback_data="day_Четверг")
+            InlineKeyboardButton(
+                "👥 Для всех подгрупп" + (" ✅" if current_subgroup == 'all' else ""),
+                callback_data="subgroup_all"
+            )
         ],
         [
-            InlineKeyboardButton("Пятница", callback_data="day_Пятница"),
-            InlineKeyboardButton("Суббота", callback_data="day_Суббота")
+            InlineKeyboardButton("❌ Отмена", callback_data="cancel_subgroup")
+        ]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+
+def create_day_selection_keyboard(subgroup: str = '1') -> InlineKeyboardMarkup:
+    """Inline-клавиатура для выбора дня недели с подгруппой"""
+    keyboard = [
+        [
+            InlineKeyboardButton("Понедельник", callback_data=f"day_Понедельник_{subgroup}"),
+            InlineKeyboardButton("Вторник", callback_data=f"day_Вторник_{subgroup}")
         ],
         [
-            InlineKeyboardButton("Воскресенье", callback_data="day_Воскресенье"),
-            InlineKeyboardButton("📋 Вся неделя", callback_data="day_Вся неделя")
+            InlineKeyboardButton("Среда", callback_data=f"day_Среда_{subgroup}"),
+            InlineKeyboardButton("Четверг", callback_data=f"day_Четверг_{subgroup}")
         ],
         [
+            InlineKeyboardButton("Пятница", callback_data=f"day_Пятница_{subgroup}"),
+            InlineKeyboardButton("Суббота", callback_data=f"day_Суббота_{subgroup}")
+        ],
+        [
+            InlineKeyboardButton("Воскресенье", callback_data=f"day_Воскресенье_{subgroup}"),
+            InlineKeyboardButton("📋 Вся неделя", callback_data=f"day_Вся неделя_{subgroup}")
+        ],
+        [
+            InlineKeyboardButton(f"🎯 Подгруппа {subgroup}", callback_data="change_subgroup"),
             InlineKeyboardButton("❌ Отмена", callback_data="cancel")
         ]
     ]
     return InlineKeyboardMarkup(keyboard)
 
 
-def create_day_selection_compact() -> InlineKeyboardMarkup:
-    """Компактная клавиатура для выбора дня"""
+def create_day_selection_compact(subgroup: str = '1') -> InlineKeyboardMarkup:
+    """Компактная клавиатура для выбора дня с подгруппой"""
     keyboard = [
         [
-            InlineKeyboardButton("Пн", callback_data="day_Понедельник"),
-            InlineKeyboardButton("Вт", callback_data="day_Вторник"),
-            InlineKeyboardButton("Ср", callback_data="day_Среда"),
-            InlineKeyboardButton("Чт", callback_data="day_Четверг")
+            InlineKeyboardButton("Пн", callback_data=f"day_Понедельник_{subgroup}"),
+            InlineKeyboardButton("Вт", callback_data=f"day_Вторник_{subgroup}"),
+            InlineKeyboardButton("Ср", callback_data=f"day_Среда_{subgroup}"),
+            InlineKeyboardButton("Чт", callback_data=f"day_Четверг_{subgroup}")
         ],
         [
-            InlineKeyboardButton("Пт", callback_data="day_Пятница"),
-            InlineKeyboardButton("Сб", callback_data="day_Суббота"),
-            InlineKeyboardButton("Вс", callback_data="day_Воскресенье"),
-            InlineKeyboardButton("📋 Все", callback_data="day_Вся неделя")
+            InlineKeyboardButton("Пт", callback_data=f"day_Пятница_{subgroup}"),
+            InlineKeyboardButton("Сб", callback_data=f"day_Суббота_{subgroup}"),
+            InlineKeyboardButton("Вс", callback_data=f"day_Воскресенье_{subgroup}"),
+            InlineKeyboardButton("📋 Все", callback_data=f"day_Вся неделя_{subgroup}")
+        ],
+        [
+            InlineKeyboardButton(f"🎯 Подгр. {subgroup}", callback_data="change_subgroup")
         ]
     ]
     return InlineKeyboardMarkup(keyboard)
@@ -79,22 +110,37 @@ def create_confirmation_keyboard(lesson_id: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(keyboard)
 
 
-def create_clear_day_keyboard() -> InlineKeyboardMarkup:
-    """Клавиатура для очистки дня"""
+def create_add_lesson_keyboard() -> InlineKeyboardMarkup:
+    """Клавиатура для добавления урока с выбором подгруппы"""
     keyboard = [
         [
-            InlineKeyboardButton("Понедельник", callback_data="clear_Понедельник"),
-            InlineKeyboardButton("Вторник", callback_data="clear_Вторник"),
-            InlineKeyboardButton("Среда", callback_data="clear_Среда")
+            InlineKeyboardButton("Для подгруппы 1", callback_data="add_for_1"),
+            InlineKeyboardButton("Для подгруппы 2", callback_data="add_for_2")
         ],
         [
-            InlineKeyboardButton("Четверг", callback_data="clear_Четверг"),
-            InlineKeyboardButton("Пятница", callback_data="clear_Пятница"),
-            InlineKeyboardButton("Суббота", callback_data="clear_Суббота")
+            InlineKeyboardButton("Для всех подгрупп", callback_data="add_for_all"),
+            InlineKeyboardButton("❌ Отмена", callback_data="cancel_add")
+        ]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+
+def create_clear_day_keyboard(subgroup: str = 'all') -> InlineKeyboardMarkup:
+    """Клавиатура для очистки дня с подгруппой"""
+    keyboard = [
+        [
+            InlineKeyboardButton("Понедельник", callback_data=f"clear_Понедельник_{subgroup}"),
+            InlineKeyboardButton("Вторник", callback_data=f"clear_Вторник_{subgroup}"),
+            InlineKeyboardButton("Среда", callback_data=f"clear_Среда_{subgroup}")
         ],
         [
-            InlineKeyboardButton("Воскресенье", callback_data="clear_Воскресенье"),
-            InlineKeyboardButton("🗑️ Все дни", callback_data="clear_all")
+            InlineKeyboardButton("Четверг", callback_data=f"clear_Четверг_{subgroup}"),
+            InlineKeyboardButton("Пятница", callback_data=f"clear_Пятница_{subgroup}"),
+            InlineKeyboardButton("Суббота", callback_data=f"clear_Суббота_{subgroup}")
+        ],
+        [
+            InlineKeyboardButton("Воскресенье", callback_data=f"clear_Воскресенье_{subgroup}"),
+            InlineKeyboardButton(f"🗑️ Все ({subgroup})", callback_data=f"clear_all_{subgroup}")
         ],
         [
             InlineKeyboardButton("❌ Отмена", callback_data="cancel_clear")
@@ -127,8 +173,8 @@ def create_time_slots_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(keyboard)
 
 
-def create_week_navigation_keyboard(current_day: str = None) -> InlineKeyboardMarkup:
-    """Навигация по дням недели (для просмотра расписания)"""
+def create_week_navigation_keyboard(current_day: str = None, subgroup: str = '1') -> InlineKeyboardMarkup:
+    """Навигация по дням недели с подгруппой"""
     days_order = ["Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота", "Воскресенье"]
 
     if current_day in days_order:
@@ -138,31 +184,32 @@ def create_week_navigation_keyboard(current_day: str = None) -> InlineKeyboardMa
 
         keyboard = [
             [
-                InlineKeyboardButton(f"◀️ {prev_day}", callback_data=f"nav_{prev_day}"),
-                InlineKeyboardButton(f"{next_day} ▶️", callback_data=f"nav_{next_day}")
+                InlineKeyboardButton(f"◀️ {prev_day}", callback_data=f"nav_{prev_day}_{subgroup}"),
+                InlineKeyboardButton(f"{next_day} ▶️", callback_data=f"nav_{next_day}_{subgroup}")
             ],
             [
-                InlineKeyboardButton("📋 Вся неделя", callback_data="nav_week"),
+                InlineKeyboardButton("📋 Вся неделя", callback_data=f"nav_week_{subgroup}"),
                 InlineKeyboardButton("🏠 В меню", callback_data="nav_menu")
             ]
         ]
     else:
         keyboard = [
             [
-                InlineKeyboardButton("📅 Понедельник", callback_data="nav_Понедельник"),
-                InlineKeyboardButton("📅 Вторник", callback_data="nav_Вторник"),
-                InlineKeyboardButton("📅 Среда", callback_data="nav_Среда")
+                InlineKeyboardButton("📅 Понедельник", callback_data=f"nav_Понедельник_{subgroup}"),
+                InlineKeyboardButton("📅 Вторник", callback_data=f"nav_Вторник_{subgroup}"),
+                InlineKeyboardButton("📅 Среда", callback_data=f"nav_Среда_{subgroup}")
             ],
             [
-                InlineKeyboardButton("📅 Четверг", callback_data="nav_Четверг"),
-                InlineKeyboardButton("📅 Пятница", callback_data="nav_Пятница"),
-                InlineKeyboardButton("📅 Суббота", callback_data="nav_Суббота")
+                InlineKeyboardButton("📅 Четверг", callback_data=f"nav_Четверг_{subgroup}"),
+                InlineKeyboardButton("📅 Пятница", callback_data=f"nav_Пятница_{subgroup}"),
+                InlineKeyboardButton("📅 Суббота", callback_data=f"nav_Суббота_{subgroup}")
             ],
             [
-                InlineKeyboardButton("📅 Воскресенье", callback_data="nav_Воскресенье"),
-                InlineKeyboardButton("📋 Вся неделя", callback_data="nav_week")
+                InlineKeyboardButton("📅 Воскресенье", callback_data=f"nav_Воскресенье_{subgroup}"),
+                InlineKeyboardButton("📋 Вся неделя", callback_data=f"nav_week_{subgroup}")
             ],
             [
+                InlineKeyboardButton(f"🎯 Подгр. {subgroup}", callback_data="change_subgroup"),
                 InlineKeyboardButton("🏠 В меню", callback_data="nav_menu")
             ]
         ]
@@ -170,49 +217,83 @@ def create_week_navigation_keyboard(current_day: str = None) -> InlineKeyboardMa
     return InlineKeyboardMarkup(keyboard)
 
 
-def create_schedule_actions_keyboard(day: str) -> InlineKeyboardMarkup:
+def create_schedule_actions_keyboard(day: str, subgroup: str = '1') -> InlineKeyboardMarkup:
     """Действия с расписанием на конкретный день"""
     keyboard = [
         [
-            InlineKeyboardButton("➕ Добавить урок", callback_data=f"add_to_{day}"),
-            InlineKeyboardButton("🗑️ Очистить день", callback_data=f"clear_{day}")
+            InlineKeyboardButton("➕ Добавить урок", callback_data=f"add_to_{day}_{subgroup}"),
+            InlineKeyboardButton("🗑️ Очистить день", callback_data=f"clear_{day}_{subgroup}")
         ],
         [
-            InlineKeyboardButton("◀️ Предыдущий день", callback_data=f"prev_{day}"),
-            InlineKeyboardButton("Следующий день ▶️", callback_data=f"next_{day}")
+            InlineKeyboardButton("◀️ Предыдущий день", callback_data=f"prev_{day}_{subgroup}"),
+            InlineKeyboardButton("Следующий день ▶️", callback_data=f"next_{day}_{subgroup}")
         ],
         [
-            InlineKeyboardButton("📋 Вся неделя", callback_data="show_week"),
+            InlineKeyboardButton("📋 Вся неделя", callback_data=f"show_week_{subgroup}"),
+            InlineKeyboardButton("🎯 Сменить подгруппу", callback_data="change_subgroup"),
             InlineKeyboardButton("🏠 В меню", callback_data="go_menu")
         ]
     ]
     return InlineKeyboardMarkup(keyboard)
 
 
-def create_quick_schedule_keyboard() -> ReplyKeyboardMarkup:
+def create_quick_schedule_keyboard(subgroup: str = '1') -> ReplyKeyboardMarkup:
     """Быстрая клавиатура для просмотра расписания"""
     keyboard = [
         ["Понедельник", "Вторник", "Среда"],
         ["Четверг", "Пятница", "Суббота"],
-        ["Воскресенье", "Вся неделя", "Сегодня"]
+        ["Воскресенье", "Вся неделя", "Сегодня"],
+        [f"Подгруппа: {subgroup}"]
     ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
 
 
-def create_stats_keyboard() -> InlineKeyboardMarkup:
-    """Клавиатура для статистики"""
+def create_stats_keyboard(subgroup: str = '1') -> InlineKeyboardMarkup:
+    """Клавиатура для статистики с подгруппой"""
     keyboard = [
         [
-            InlineKeyboardButton("📊 Общая статистика", callback_data="stats_general"),
-            InlineKeyboardButton("📅 По дням", callback_data="stats_by_day")
+            InlineKeyboardButton(f"📊 Общая ({subgroup})", callback_data=f"stats_general_{subgroup}"),
+            InlineKeyboardButton(f"📅 По дням ({subgroup})", callback_data=f"stats_by_day_{subgroup}")
         ],
         [
-            InlineKeyboardButton("📚 По предметам", callback_data="stats_by_subject"),
-            InlineKeyboardButton("⏰ По времени", callback_data="stats_by_time")
+            InlineKeyboardButton(f"📚 По предметам ({subgroup})", callback_data=f"stats_by_subject_{subgroup}"),
+            InlineKeyboardButton(f"⏰ По времени ({subgroup})", callback_data=f"stats_by_time_{subgroup}")
         ],
         [
-            InlineKeyboardButton("🔄 Обновить", callback_data="stats_refresh"),
+            InlineKeyboardButton(f"🔄 Обновить", callback_data=f"stats_refresh_{subgroup}"),
+            InlineKeyboardButton("🎯 Сменить подгруппу", callback_data="change_subgroup"),
             InlineKeyboardButton("🏠 В меню", callback_data="stats_menu")
+        ]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+
+def create_subgroup_filter_keyboard(current_subgroup: str = 'all') -> InlineKeyboardMarkup:
+    """Клавиатура для фильтрации по подгруппам"""
+    keyboard = [
+        [
+            InlineKeyboardButton(
+                "🎯 Только 1" + (" ✅" if current_subgroup == '1' else ""),
+                callback_data="filter_1"
+            ),
+            InlineKeyboardButton(
+                "🎯 Только 2" + (" ✅" if current_subgroup == '2' else ""),
+                callback_data="filter_2"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                "👥 Все подгруппы" + (" ✅" if current_subgroup == 'all' else ""),
+                callback_data="filter_all"
+            ),
+            InlineKeyboardButton(
+                "👥 Для всех" + (" ✅" if current_subgroup == 'common' else ""),
+                callback_data="filter_common"
+            )
+        ],
+        [
+            InlineKeyboardButton("❌ Сбросить фильтр", callback_data="filter_reset"),
+            InlineKeyboardButton("❌ Отмена", callback_data="cancel_filter")
         ]
     ]
     return InlineKeyboardMarkup(keyboard)
@@ -254,7 +335,20 @@ def create_home_keyboard(home_text="🏠 В меню", home_data="home") -> Inli
     return InlineKeyboardMarkup(keyboard)
 
 
-# Устаревшие функции (можно удалить или оставить для совместимости)
+def create_subgroup_switch_keyboard(current_subgroup: str) -> InlineKeyboardMarkup:
+    """Быстрое переключение подгруппы"""
+    keyboard = [
+        [
+            InlineKeyboardButton("🎯 1", callback_data="switch_1"),
+            InlineKeyboardButton("🎯 2", callback_data="switch_2"),
+            InlineKeyboardButton("👥 Все", callback_data="switch_all")
+        ]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+
+# ===== СТАРЫЕ ФУНКЦИИ ДЛЯ СОВМЕСТИМОСТИ =====
+
 def create_settings_keyboard() -> InlineKeyboardMarkup:
     """Клавиатура настроек (устаревшая)"""
     keyboard = [
@@ -268,3 +362,39 @@ def create_settings_keyboard() -> InlineKeyboardMarkup:
 def create_time_selection_keyboard() -> InlineKeyboardMarkup:
     """Выбор времени (устаревшая версия)"""
     return create_time_slots_keyboard()
+
+
+# ===== НОВЫЕ ФУНКЦИИ ДЛЯ ПОДГРУПП =====
+
+def create_subgroup_management_keyboard() -> InlineKeyboardMarkup:
+    """Управление подгруппами"""
+    keyboard = [
+        [
+            InlineKeyboardButton("🎯 Выбрать подгруппу", callback_data="manage_select"),
+            InlineKeyboardButton("👥 Показать все", callback_data="manage_show_all")
+        ],
+        [
+            InlineKeyboardButton("➕ Добавить для подгр. 1", callback_data="manage_add_1"),
+            InlineKeyboardButton("➕ Добавить для подгр. 2", callback_data="manage_add_2")
+        ],
+        [
+            InlineKeyboardButton("📊 Статистика по подгруппам", callback_data="manage_stats"),
+            InlineKeyboardButton("🏠 В меню", callback_data="manage_menu")
+        ]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+
+def create_lesson_detail_keyboard(lesson_id: int, subgroup: str = 'all') -> InlineKeyboardMarkup:
+    """Детали урока с подгруппой"""
+    keyboard = [
+        [
+            InlineKeyboardButton("✏️ Изменить", callback_data=f"edit_{lesson_id}"),
+            InlineKeyboardButton("🗑️ Удалить", callback_data=f"delete_{lesson_id}")
+        ],
+        [
+            InlineKeyboardButton(f"🎯 Подгр. {subgroup}", callback_data=f"subgroup_{subgroup}"),
+            InlineKeyboardButton("↩️ Назад", callback_data="back_to_list")
+        ]
+    ]
+    return InlineKeyboardMarkup(keyboard)

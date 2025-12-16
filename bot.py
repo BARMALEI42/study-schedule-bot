@@ -5,7 +5,8 @@ from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes, CallbackQueryHandler
 from dotenv import load_dotenv
 from database import ScheduleDatabase
-from keyboards import create_main_menu, create_confirmation_keyboard, create_day_selection_keyboard
+from keyboards import create_main_menu, create_confirmation_keyboard, create_day_selection_keyboard, \
+    create_subgroup_selection_keyboard
 from messages import (
     WELCOME_MESSAGE, HELP_MESSAGE,
     format_lesson_message,
@@ -17,7 +18,7 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("telegram").setLevel(logging.WARNING)
 logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s',
-    level=logging.WARNING,  # Меньше логов = меньше CPU
+    level=logging.WARNING,
     datefmt='%H:%M:%S'
 )
 
@@ -29,141 +30,206 @@ if not TOKEN:
     print("❌ ОШИБКА: Токен не найден!")
     exit(1)
 
-# Инициализация базы данных (один раз при запуске)
+# Инициализация базы данных
 db = ScheduleDatabase()
-print("🤖 Бот оптимизирован для минимального потребления CPU")
-print(f"📱 Токен: {TOKEN[:10]}...")
+print("🤖 Бот с поддержкой подгрупп запущен")
 
-# === КЭШИРОВАНИЕ ДАННЫХ ===
+# === КЭШИРОВАНИЕ ДАННЫХ С ПОДДЕРЖКОЙ ПОДГРУПП ===
 _schedule_cache = {}
 _cache_timestamp = None
-CACHE_TIMEOUT = 300  # 5 минут кэширования
+CACHE_TIMEOUT = 300
 
 
-def get_cached_schedule():
-    """Кэшируем расписание для экономии запросов к БД"""
+def get_cached_schedule(subgroup: str = 'all'):
+    """Кэшируем расписание для каждой подгруппы отдельно"""
     global _schedule_cache, _cache_timestamp
 
+    cache_key = f"subgroup_{subgroup}"
     now = datetime.datetime.now()
-    if (_cache_timestamp is None or
-            (now - _cache_timestamp).seconds > CACHE_TIMEOUT or
-            not _schedule_cache):
 
-        # Обновляем кэш
-        _schedule_cache = {}
-        days = db.get_all_days_with_lessons()
+    if (cache_key not in _schedule_cache or
+            _cache_timestamp is None or
+            (now - _cache_timestamp).seconds > CACHE_TIMEOUT):
+
+        # Обновляем кэш для этой подгруппы
+        _schedule_cache[cache_key] = {}
+        days = db.get_all_days_with_lessons_for_subgroup(subgroup)
         for day in days:
-            lessons = db.get_lessons_by_day(day)
+            lessons = db.get_lessons_by_day_and_subgroup(day, subgroup)
             if lessons:
-                _schedule_cache[day] = lessons
+                _schedule_cache[cache_key][day] = lessons
         _cache_timestamp = now
-        logging.info("Кэш расписания обновлен")
+        logging.info(f"Кэш для подгруппы {subgroup} обновлен")
 
-    return _schedule_cache
+    return _schedule_cache.get(cache_key, {})
 
 
-def clear_schedule_cache():
-    """Очистка кэша (вызывать при изменении расписания)"""
+def clear_schedule_cache(subgroup: str = None):
+    """Очистка кэша"""
     global _schedule_cache, _cache_timestamp
-    _schedule_cache = {}
+    if subgroup:
+        cache_key = f"subgroup_{subgroup}"
+        if cache_key in _schedule_cache:
+            del _schedule_cache[cache_key]
+    else:
+        _schedule_cache = {}
     _cache_timestamp = None
 
 
-async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Команда /start - оптимизированная"""
-    user = update.effective_user
+# === ХРАНЕНИЕ ВЫБРАННОЙ ПОДГРУППЫ ДЛЯ КАЖДОГО ПОЛЬЗОВАТЕЛЯ ===
+user_subgroups = {}
 
-    # Используем кэшированные данные
-    cached_data = get_cached_schedule()
+
+def get_user_subgroup(user_id: int) -> str:
+    """Получить выбранную подгруппу пользователя"""
+    return user_subgroups.get(user_id, '1')  # По умолчанию подгруппа 1
+
+
+def set_user_subgroup(user_id: int, subgroup: str):
+    """Установить подгруппу для пользователя"""
+    user_subgroups[user_id] = subgroup
+    clear_schedule_cache(subgroup)  # Очищаем кэш для этой подгруппы
+
+
+# === КОМАНДЫ БОТА ===
+async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Команда /start"""
+    user = update.effective_user
+    user_id = user.id
+    subgroup = get_user_subgroup(user_id)
+
+    # Используем кэшированные данные для подгруппы пользователя
+    cached_data = get_cached_schedule(subgroup)
     days_with_lessons = list(cached_data.keys())
     week_overview = format_week_overview(days_with_lessons)
 
-    keyboard = create_main_menu()
+    keyboard = create_main_menu(subgroup)
 
     await update.message.reply_text(
-        f"Привет, {user.first_name}! 👋\n{week_overview}",
+        f"Привет, {user.first_name}! 👋\n"
+        f"Текущая подгруппа: 🎯 {subgroup}\n\n{week_overview}",
         parse_mode='Markdown',
         reply_markup=keyboard
     )
 
 
-async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Команда /help - статичный текст, без оптимизации"""
-    await update.message.reply_text(HELP_MESSAGE, parse_mode='Markdown')
+async def subgroup_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Команда выбора подгруппы: /subgroup"""
+    user_id = update.effective_user.id
+    current_subgroup = get_user_subgroup(user_id)
+
+    keyboard = create_subgroup_selection_keyboard(current_subgroup)
+    await update.message.reply_text(
+        "🎯 *Выберите вашу подгруппу:*\n\n"
+        "• Подгруппа 1 - ваши индивидуальные уроки\n"
+        "• Подгруппа 2 - уроки для второй подгруппы\n"
+        "• Для всех - общие уроки",
+        parse_mode='Markdown',
+        reply_markup=keyboard
+    )
 
 
 async def schedule_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Меню выбора дня - быстрый отклик"""
-    keyboard = create_day_selection_keyboard()
+    """Меню выбора дня: /schedule"""
+    user_id = update.effective_user.id
+    subgroup = get_user_subgroup(user_id)
+
+    keyboard = create_day_selection_keyboard(subgroup)
     await update.message.reply_text(
-        "📅 Выберите день:",
+        f"📅 Выберите день (подгруппа {subgroup}):",
         reply_markup=keyboard
     )
 
 
 async def today_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Расписание на сегодня - с кэшем"""
+    """Расписание на сегодня: /today"""
+    user_id = update.effective_user.id
+    subgroup = get_user_subgroup(user_id)
+
     days_ru = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье']
     today_idx = datetime.datetime.now().weekday()
     today_ru = days_ru[today_idx]
 
-    # Используем кэш
-    cached_data = get_cached_schedule()
+    # Используем кэш для подгруппы
+    cached_data = get_cached_schedule(subgroup)
     lessons = cached_data.get(today_ru, [])
 
     if lessons:
-        message = f"📅 *{today_ru}:*\n\n"
+        message = f"📅 *{today_ru}* (подгруппа {subgroup}):\n\n"
         for lesson in lessons:
-            message += f"• {lesson['time']} - {lesson['subject']}\n"
+            subgroup_mark = ""
+            if lesson.get('subgroup') == '1':
+                subgroup_mark = " [1]"
+            elif lesson.get('subgroup') == '2':
+                subgroup_mark = " [2]"
+            message += f"• {lesson['time']} - {lesson['subject']}{subgroup_mark}\n"
     else:
-        message = f"🎉 *{today_ru}*\nСегодня нет уроков!"
+        message = f"🎉 *{today_ru}*\nСегодня нет уроков для подгруппы {subgroup}!"
 
     await update.message.reply_text(message, parse_mode='Markdown')
 
 
 async def tomorrow_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Расписание на завтра - с кэшем"""
+    """Расписание на завтра: /tomorrow"""
+    user_id = update.effective_user.id
+    subgroup = get_user_subgroup(user_id)
+
     days_ru = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье']
     tomorrow_idx = (datetime.datetime.now().weekday() + 1) % 7
     tomorrow_ru = days_ru[tomorrow_idx]
 
-    # Используем кэш
-    cached_data = get_cached_schedule()
+    # Используем кэш для подгруппы
+    cached_data = get_cached_schedule(subgroup)
     lessons = cached_data.get(tomorrow_ru, [])
 
     if lessons:
-        message = f"📅 *{tomorrow_ru}:*\n\n"
+        message = f"📅 *{tomorrow_ru}* (подгруппа {subgroup}):\n\n"
         for lesson in lessons:
-            message += f"• {lesson['time']} - {lesson['subject']}\n"
+            subgroup_mark = ""
+            if lesson.get('subgroup') == '1':
+                subgroup_mark = " [1]"
+            elif lesson.get('subgroup') == '2':
+                subgroup_mark = " [2]"
+            message += f"• {lesson['time']} - {lesson['subject']}{subgroup_mark}\n"
     else:
-        message = f"📅 *{tomorrow_ru}*\nЗавтра нет уроков!"
+        message = f"📅 *{tomorrow_ru}*\nЗавтра нет уроков для подгруппы {subgroup}!"
 
     await update.message.reply_text(message, parse_mode='Markdown')
 
 
 async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработка inline-кнопок - с кэшем"""
+    """Обработка inline-кнопок"""
     query = update.callback_query
     await query.answer()
+    user_id = query.from_user.id
+
+    # === ОБРАБОТКА ВЫБОРА ПОДГРУППЫ ===
+    if query.data.startswith('subgroup_'):
+        subgroup = query.data.replace('subgroup_', '')
+        if subgroup in ['1', '2', 'all']:
+            set_user_subgroup(user_id, subgroup)
+            keyboard = create_main_menu(subgroup)
+            await query.edit_message_text(
+                text=f"✅ Выбрана подгруппа: 🎯 {subgroup}\n\nТеперь вы будете видеть уроки для этой подгруппы.",
+                parse_mode='Markdown',
+                reply_markup=keyboard
+            )
+        return
 
     # === ОБРАБОТКА КНОПОК УДАЛЕНИЯ ===
     if query.data.startswith('confirm_delete_'):
         try:
-            # Извлекаем ID урока из callback_data
-            # callback_data имеет формат: "confirm_delete_123" (где 123 - ID урока)
             lesson_id = int(query.data.split('_')[-1])
-
-            # Получаем сам урок для информации
             lesson = db.get_lesson_by_id(lesson_id)
 
             if lesson:
-                # Удаляем урок из базы
                 success = db.delete_lesson(lesson_id)
-
                 if success:
-                    clear_schedule_cache()  # Очищаем кэш
+                    clear_schedule_cache()  # Очищаем весь кэш
                     message = f"✅ Урок удален!\n\n"
                     message += f"• Предмет: {lesson.get('subject', 'Неизвестно')}\n"
+                    if lesson.get('subgroup') != 'all':
+                        message += f"• Подгруппа: {lesson.get('subgroup')}\n"
                     message += f"• Время: {lesson.get('time', 'Неизвестно')}\n"
                     message += f"• День: {lesson.get('day', 'Неизвестно')}"
                 else:
@@ -176,29 +242,37 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await query.edit_message_text(text=message, parse_mode='Markdown')
 
-    # === ОБРАБОТКА КНОПОК ВЫБОРА ДНЯ ===
+    # === ОБРАБОТКА КНОПОК ВЫБОРА ДНЯ С ПОДГРУППОЙ ===
     elif query.data.startswith('day_'):
-        day = query.data[4:]
+        parts = query.data.split('_')
+        if len(parts) >= 3:
+            day = parts[1]
+            subgroup = parts[2] if len(parts) > 2 else get_user_subgroup(user_id)
 
-        cached_data = get_cached_schedule()
+            cached_data = get_cached_schedule(subgroup)
 
-        if day == 'Вся неделя':
-            message = format_full_schedule_by_days(cached_data)
-        else:
-            lessons = cached_data.get(day, [])
-            message = format_day_schedule(day, lessons)
+            if day == 'Вся неделя':
+                message = format_full_schedule_by_days(cached_data)
+                message += f"\n\n🎯 *Подгруппа: {subgroup}*"
+            else:
+                lessons = cached_data.get(day, [])
+                message = format_day_schedule(day, lessons)
+                message += f"\n\n🎯 *Подгруппа: {subgroup}*"
 
-        await query.edit_message_text(text=message, parse_mode='Markdown')
+            await query.edit_message_text(text=message, parse_mode='Markdown')
 
-    # === ОБРАБОТКА КНОПКИ ОТМЕНЫ УДАЛЕНИЯ ===
-    elif query.data == 'cancel_delete':
+    # === ОБРАБОТКА КНОПКИ СМЕНЫ ПОДГРУППЫ ===
+    elif query.data == 'change_subgroup':
+        current_subgroup = get_user_subgroup(user_id)
+        keyboard = create_subgroup_selection_keyboard(current_subgroup)
         await query.edit_message_text(
-            text="❌ Удаление отменено",
-            parse_mode='Markdown'
+            text="🎯 *Выберите подгруппу:*",
+            parse_mode='Markdown',
+            reply_markup=keyboard
         )
 
-    # === ОБРАБОТКА ПРОЧИХ КНОПОК (если есть) ===
-    elif query.data == 'cancel':
+    # === ОБРАБОТКА КНОПКИ ОТМЕНЫ ===
+    elif query.data in ['cancel_delete', 'cancel', 'cancel_subgroup']:
         await query.edit_message_text(
             text="❌ Действие отменено",
             parse_mode='Markdown'
@@ -206,27 +280,52 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def add_lesson_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Добавить урок - с очисткой кэша"""
+    """Добавить урок: /add <предмет> <время> <день> [подгруппа]"""
     if not context.args or len(context.args) < 3:
         await update.message.reply_text(
-            "Формат: /add <предмет> <время> <день>\nПример: /add Математика 10:00 Понедельник"
+            "📝 *Формат:* `/add <предмет> <время> <день> [подгруппа]`\n\n"
+            "📌 *Примеры:*\n"
+            "• `/add Математика 10:00 Понедельник` - для всех\n"
+            "• `/add Математика 10:00 Понедельник 1` - для подгруппы 1\n"
+            "• `/add Математика 10:00 Понедельник 2` - для подгруппы 2\n"
+            "• `/add Математика 10:00 Понедельник all` - для всех подгрупп\n\n"
+            "⚠️ *Подгруппа по умолчанию:* `all`",
+            parse_mode='Markdown'
         )
         return
 
     subject, time, day = context.args[0], context.args[1], context.args[2]
-    result = db.add_lesson({'subject': subject, 'time': time, 'day': day})
+    subgroup = context.args[3] if len(context.args) > 3 else 'all'
+
+    # Проверяем корректность подгруппы
+    if subgroup not in ['1', '2', 'all']:
+        await update.message.reply_text(
+            "❌ Некорректная подгруппа. Используйте: `1`, `2` или `all`",
+            parse_mode='Markdown'
+        )
+        return
+
+    lesson_data = {
+        'subject': subject,
+        'time': time,
+        'day': day,
+        'subgroup': subgroup
+    }
+
+    result = db.add_lesson(lesson_data)
 
     if result.get('success'):
-        clear_schedule_cache()  # Очищаем кэш при изменении
-        await update.message.reply_text(f"✅ '{subject}' добавлен на {day} в {time}")
+        clear_schedule_cache(subgroup)  # Очищаем кэш для этой подгруппы
+        subgroup_text = f" (подгруппа {subgroup})" if subgroup != 'all' else " (для всех)"
+        await update.message.reply_text(f"✅ '{subject}' добавлен на {day} в {time}{subgroup_text}")
     else:
-        await update.message.reply_text("❌ Ошибка")
+        await update.message.reply_text("❌ Ошибка при добавлении урока")
 
 
 async def delete_lesson_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Удалить урок - с очисткой кэша"""
+    """Удалить урок: /delete <id>"""
     if not context.args:
-        await update.message.reply_text("Укажите ID урока: /delete 1")
+        await update.message.reply_text("Укажите ID урока: `/delete 1`", parse_mode='Markdown')
         return
 
     try:
@@ -242,6 +341,8 @@ async def delete_lesson_command(update: Update, context: ContextTypes.DEFAULT_TY
         message += f"• Предмет: {lesson.get('subject', 'Неизвестно')}\n"
         message += f"• Время: {lesson.get('time', 'Неизвестно')}\n"
         message += f"• День: {lesson.get('day', 'Неизвестно')}\n"
+        if lesson.get('subgroup') != 'all':
+            message += f"• Подгруппа: {lesson.get('subgroup')}\n"
         message += f"• ID: {lesson.get('id', 'Неизвестно')}"
 
         await update.message.reply_text(
@@ -253,48 +354,108 @@ async def delete_lesson_command(update: Update, context: ContextTypes.DEFAULT_TY
         await update.message.reply_text("❌ Введите правильный ID (число)")
 
 
+async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Статистика: /stats"""
+    user_id = update.effective_user.id
+    subgroup = get_user_subgroup(user_id)
+
+    stats = db.get_stats_for_subgroup(subgroup)
+
+    message = f"📊 *Статистика (подгруппа {subgroup}):*\n\n"
+    message += f"• Всего уроков: *{stats['total_lessons']}*\n"
+    message += f"• Дней с уроками: *{stats['days_with_lessons']}*\n"
+    message += f"• Разных предметов: *{stats['subjects_count']}*\n"
+
+    if stats.get('most_busy_day'):
+        message += f"• Самый загруженный день: *{stats['most_busy_day']}*\n"
+
+    # Показываем количество уроков по дням
+    if stats.get('lessons_by_day'):
+        message += f"\n📅 *Уроков по дням:*\n"
+        for day, count in stats['lessons_by_day'].items():
+            message += f"• {day}: {count}\n"
+
+    await update.message.reply_text(message, parse_mode='Markdown')
+
+
+async def week_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Расписание на всю неделю: /week"""
+    user_id = update.effective_user.id
+    subgroup = get_user_subgroup(user_id)
+
+    cached_data = get_cached_schedule(subgroup)
+    message = format_full_schedule_by_days(cached_data)
+    message += f"\n\n🎯 *Подгруппа: {subgroup}*"
+
+    await update.message.reply_text(message, parse_mode='Markdown')
+
+
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Помощь: /help"""
+    help_text = (
+            HELP_MESSAGE +
+            "\n\n🎯 *Работа с подгруппами:*\n"
+            "• Используйте команду `/subgroup` для выбора подгруппы\n"
+            "• Подгруппа `1` - ваши индивидуальные уроки\n"
+            "• Подгруппа `2` - уроки для второй подгруппы\n"
+            "• `all` - общие уроки для всех\n\n"
+            "📝 *Добавление урока с подгруппой:*\n"
+            "`/add Математика 10:00 Понедельник 1` - для подгруппы 1\n"
+            "`/add Математика 10:00 Понедельник 2` - для подгруппы 2\n"
+            "`/add Математика 10:00 Понедельник all` - для всех\n\n"
+            "📊 *Просмотр статистики:* `/stats`\n"
+            "📅 *Вся неделя:* `/week`"
+    )
+    await update.message.reply_text(help_text, parse_mode='Markdown')
+
+
 async def clear_cache_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Служебная команда для очистки кэша"""
+    """Очистка кэша: /clearcache"""
     clear_schedule_cache()
-    await update.message.reply_text("✅ Кэш очищен")
+    await update.message.reply_text("✅ Кэш расписания очищен")
 
 
 def main():
-    """Запуск оптимизированного бота"""
-    print("🚀 Запуск оптимизированного бота...")
+    """Запуск бота с поддержкой подгрупп"""
+    print("🚀 Запуск бота с поддержкой подгрупп...")
+    print(f"📱 Токен: {TOKEN[:10]}...")
 
-    # Создаем приложение с оптимизированными настройками
+    # Миграция старых данных (если нужно)
+    db.migrate_to_subgroups()
+    print("✅ База данных обновлена для поддержки подгрупп")
+
     application = Application.builder().token(TOKEN).build()
 
-    # === ОПТИМИЗИРОВАННЫЙ ПОРЯДОК ОБРАБОТЧИКОВ ===
-    # Самые частые команды первыми
+    # Регистрируем обработчики команд
     application.add_handler(CommandHandler("start", start_command))
+    application.add_handler(CommandHandler("subgroup", subgroup_command))
     application.add_handler(CommandHandler("today", today_command))
     application.add_handler(CommandHandler("tomorrow", tomorrow_command))
     application.add_handler(CommandHandler("schedule", schedule_command))
+    application.add_handler(CommandHandler("week", week_command))
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CommandHandler("add", add_lesson_command))
     application.add_handler(CommandHandler("delete", delete_lesson_command))
-    application.add_handler(CommandHandler("clearcache", clear_cache_command))  # Новая команда
+    application.add_handler(CommandHandler("stats", stats_command))
+    application.add_handler(CommandHandler("clearcache", clear_cache_command))
 
     # Обработчик кнопок
     application.add_handler(CallbackQueryHandler(button_callback))
 
-    # === ОПТИМИЗИРОВАННЫЙ ЗАПУСК ===
-    print("⚡ Оптимизации:")
-    print("  • Кэширование расписания (5 мин)")
-    print("  • Минимальное логирование")
-    print("  • Уменьшены запросы к БД")
-    print("  • Статические тексты в памяти")
-    print("📝 Напишите /start в Telegram")
+    print("⚡ Функции:")
+    print("  • Поддержка 2 подгрупп и общих уроков")
+    print("  • Кэширование для каждой подгруппы отдельно")
+    print("  • Персональные настройки подгруппы для каждого пользователя")
+    print("  • Миграция старых данных к новому формату")
+    print("\n📝 Напишите /start в Telegram")
+    print("🎯 Используйте /subgroup для выбора подгруппы")
 
-    # Оптимизированные параметры polling
     try:
         application.run_polling(
-            poll_interval=2.0,  # Увеличен интервал опроса (было 1.0)
-            timeout=15,  # Уменьшен таймаут
+            poll_interval=2.0,
+            timeout=15,
             drop_pending_updates=True,
-            close_loop=False  # Экономит ресурсы
+            close_loop=False
         )
     except KeyboardInterrupt:
         print("\n👋 Бот остановлен")
