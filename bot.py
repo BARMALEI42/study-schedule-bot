@@ -175,9 +175,9 @@ async def subgroup_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard = create_subgroup_selection_keyboard(current_subgroup)
         await update.message.reply_text(
             r"🎯 *Выберите вашу подгруппу:*\n\n"
-            r"• Подгруппа 1 - ваши индивидуальные уроки\n"
-            r"• Подгруппа 2 - уроки для второй подгруппы\n"
-            r"• Для всех - общие уроки",
+            r"• Подгруппа 1 \- ваши индивидуальные уроки\n"
+            r"• Подгруппа 2 \- уроки для второй подгруппы\n"
+            r"• Для всех \- общие уроки",
             parse_mode='MarkdownV2',
             reply_markup=keyboard
         )
@@ -195,7 +195,8 @@ async def schedule_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         keyboard = create_day_selection_keyboard(subgroup)
         await update.message.reply_text(
-            f"📅 Выберите день (подгруппа {escape_markdown_v2(subgroup)}):",
+            f"📅 Выберите день \(подгруппа {escape_markdown_v2(subgroup)}\):",
+            parse_mode='MarkdownV2',
             reply_markup=keyboard
         )
     except Exception as e:
@@ -245,6 +246,8 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.answer()
         user_id = query.from_user.id
 
+        print(f"🔘 Нажата кнопка: callback_data='{query.data}', user_id={user_id}")
+
         # Обработка выбора подгруппы
         if query.data.startswith('subgroup_'):
             subgroup = query.data.replace('subgroup_', '')
@@ -252,7 +255,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 set_user_subgroup(user_id, subgroup)
                 keyboard = create_main_menu(subgroup)
                 await query.edit_message_text(
-                    text=f"✅ Выбрана подгруппа: 🎯 {escape_markdown_v2(subgroup)}\n\nТеперь вы будете видеть уроки для этой подгруппы\.",
+                    text=f"✅ Выбрана подгруппа: 🎯 {escape_markdown_v2(subgroup)}\n\nТеперь вы будете видеть уроки для этой подгруппы\\.",
                     parse_mode='MarkdownV2',
                     reply_markup=keyboard
                 )
@@ -287,21 +290,33 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Обработка кнопок выбора дня
         if query.data.startswith('day_'):
             parts = query.data.split('_')
+            print(f"   DEBUG parts: {parts}")
+
             if len(parts) >= 3:
+                # Формат: day_Понедельник_1
                 day = parts[1]
-                subgroup = parts[2] if len(parts) > 2 else get_user_subgroup(user_id)
+                subgroup = parts[2]
+            elif len(parts) == 2:
+                # Формат: day_Понедельник
+                day = parts[1]
+                subgroup = get_user_subgroup(user_id)
+            else:
+                day = "Понедельник"
+                subgroup = get_user_subgroup(user_id)
 
-                cached_data = get_cached_schedule(subgroup)
+            print(f"   DEBUG: day='{day}', subgroup='{subgroup}'")
 
-                if day == 'Вся неделя':
-                    message = format_full_schedule_by_days(cached_data)
-                    message += f"\n\n🎯 *Подгруппа: {escape_markdown_v2(subgroup)}*"
-                else:
-                    lessons = cached_data.get(day, [])
-                    message = format_day_schedule(day, lessons)
-                    message += f"\n\n🎯 *Подгруппа: {escape_markdown_v2(subgroup)}*"
+            cached_data = get_cached_schedule(subgroup)
 
-                await query.edit_message_text(text=message, parse_mode='MarkdownV2')
+            if day == 'Вся неделя':
+                message = format_full_schedule_by_days(cached_data)
+                message += f"\n\n🎯 *Подгруппа: {escape_markdown_v2(subgroup)}*"
+            else:
+                lessons = cached_data.get(day, [])
+                message = format_day_schedule(day, lessons)
+                message += f"\n\n🎯 *Подгруппа: {escape_markdown_v2(subgroup)}*"
+
+            await query.edit_message_text(text=message, parse_mode='MarkdownV2')
             return
 
         # Обработка кнопки смены подгруппы
@@ -321,10 +336,24 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 text="❌ Действие отменено",
                 parse_mode='MarkdownV2'
             )
+            return
+
+        # Если callback_data не распознан
+        print(f"⚠️ Неизвестный callback_data: '{query.data}'")
+        await query.edit_message_text(
+            text="❌ Эта кнопка пока не работает",
+            parse_mode='MarkdownV2'
+        )
+
     except Exception as e:
         print(f"❌ ОШИБКА в button_callback: {e}")
         import traceback
         traceback.print_exc()
+        if update.callback_query:
+            await update.callback_query.edit_message_text(
+                text=f"❌ Ошибка: {str(e)[:100]}",
+                parse_mode='MarkdownV2'
+            )
 
 
 async def add_lesson_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
