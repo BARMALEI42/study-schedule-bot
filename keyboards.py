@@ -1,10 +1,9 @@
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup
+from telegram import ReplyKeyboardMarkup
 
 # === КОНСТАНТЫ ===
 DAYS_FULL = ["Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота", "Воскресенье"]
 
-
-# === ОСНОВНЫЕ КЛАВИАТУРЫ ===
+# === ГЛАВНОЕ МЕНЮ (оставляем только обычную клавиатуру) ===
 def create_main_menu(subgroup: str = '1') -> ReplyKeyboardMarkup:
     """Главное меню бота - ОБЫЧНАЯ КЛАВИАТУРА"""
     menu = [
@@ -16,45 +15,60 @@ def create_main_menu(subgroup: str = '1') -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup(menu, resize_keyboard=True, one_time_keyboard=False)
 
 
-def create_subgroup_selection_keyboard(current_subgroup: str = '1') -> InlineKeyboardMarkup:
-    """Выбор подгруппы - INLINE КЛАВИАТУРА"""
-    keyboard = [
-        [
-            InlineKeyboardButton("🎯 Подгруппа 1" + (" ✅" if current_subgroup == '1' else ""),
-                                 callback_data="subgroup_1"),
-            InlineKeyboardButton("🎯 Подгруппа 2" + (" ✅" if current_subgroup == '2' else ""),
-                                 callback_data="subgroup_2")
-        ],
-        [InlineKeyboardButton("👥 Для всех" + (" ✅" if current_subgroup == 'all' else ""),
-                              callback_data="subgroup_all")],
-        [InlineKeyboardButton("❌ Отмена", callback_data="cancel")]
-    ]
-    return InlineKeyboardMarkup(keyboard)
+# === ТЕКСТОВЫЕ КОМАНДЫ (вместо inline-кнопок) ===
+def get_days_list(subgroup: str = '1') -> str:
+    """Возвращает текстовый список дней"""
+    days_text = "📅 Доступные дни:\n\n"
+    for day in DAYS_FULL:
+        days_text += f"/day_{day.lower()} - {day} (подгруппа {subgroup})\n"
+    days_text += f"\n/week - Вся неделя (подгруппа {subgroup})"
+    return days_text
 
 
-def create_day_selection_keyboard(subgroup: str = '1') -> InlineKeyboardMarkup:
-    """Клавиатура для выбора дня недели - INLINE КЛАВИАТУРА"""
-    # Создаем кнопки дней
+def get_subgroups_list() -> str:
+    """Возвращает текстовый список подгрупп"""
+    return (
+        "🎯 Доступные подгруппы:\n\n"
+        "/subgroup_1 - Подгруппа 1\n"
+        "/subgroup_2 - Подгруппа 2\n"
+        "/subgroup_all - Для всех подгрупп"
+    )
+
+
+def get_confirmation_text(lesson_id: int) -> str:
+    """Текст для подтверждения удаления"""
+    return (
+        f"🗑️ Удалить урок #{lesson_id}?\n\n"
+        "Напишите:\n"
+        f"✅ /confirm_delete_{lesson_id} - чтобы удалить\n"
+        "❌ /cancel - чтобы отменить"
+    )
+
+
+# === ТЕКСТОВЫЕ КОМАНДЫ ДЛЯ ДНЕЙ ===
+def get_day_commands() -> list:
+    """Возвращает список команд для дней"""
+    commands = []
+    for day in DAYS_FULL:
+        commands.append(f"/day_{day.lower()}")
+    return commands
+
+
+# === УПРОЩЕННЫЕ КЛАВИАТУРЫ (если всё же понадобятся) ===
+def create_simple_days_keyboard() -> ReplyKeyboardMarkup:
+    """Простая клавиатура с днями"""
     keyboard = []
     for i in range(0, len(DAYS_FULL), 3):
-        row = []
-        for day in DAYS_FULL[i:i + 3]:
-            row.append(InlineKeyboardButton(day, callback_data=f"day_{day}_{subgroup}"))
+        row = DAYS_FULL[i:i + 3]
         keyboard.append(row)
-
-    # Добавляем кнопку "Вся неделя" и отмены
-    keyboard.append([
-        InlineKeyboardButton("📋 Вся неделя", callback_data=f"day_Вся неделя_{subgroup}"),
-        InlineKeyboardButton("❌ Отмена", callback_data="cancel")
-    ])
-
-    return InlineKeyboardMarkup(keyboard)
+    keyboard.append(["📋 Вся неделя", "🏠 Главное меню"])
+    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
 
-def create_confirmation_keyboard(lesson_id: int) -> InlineKeyboardMarkup:
-    """Клавиатура подтверждения удаления - INLINE КЛАВИАТУРА"""
-    keyboard = [[
-        InlineKeyboardButton("✅ Да, удалить", callback_data=f"confirm_delete_{lesson_id}"),
-        InlineKeyboardButton("❌ Нет, оставить", callback_data="cancel_delete")
-    ]]
-    return InlineKeyboardMarkup(keyboard)
+def create_simple_subgroups_keyboard() -> ReplyKeyboardMarkup:
+    """Простая клавиатура с подгруппами"""
+    keyboard = [
+        ["🎯 Подгруппа 1", "🎯 Подгруппа 2"],
+        ["👥 Для всех", "🏠 Главное меню"]
+    ]
+    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)

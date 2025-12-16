@@ -2,11 +2,10 @@ import os
 import datetime
 import logging
 from telegram import Update
-from telegram.ext import Application, CommandHandler, ContextTypes, CallbackQueryHandler
+from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
 from dotenv import load_dotenv
 from database import ScheduleDatabase
-from keyboards import create_main_menu, create_confirmation_keyboard, create_day_selection_keyboard, \
-    create_subgroup_selection_keyboard
+from keyboards import create_main_menu, get_days_list, get_subgroups_list
 from messages import format_day_schedule, format_full_schedule_by_days, format_week_overview
 
 # === НАСТРОЙКА ЛОГГИРОВАНИЯ ===
@@ -32,6 +31,15 @@ print("🤖 Бот с поддержкой подгрупп запущен")
 
 # === КОНСТАНТЫ ===
 DAYS_RU = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье']
+DAYS_COMMANDS = {
+    'понедельник': 'Понедельник',
+    'вторник': 'Вторник',
+    'среда': 'Среда',
+    'четверг': 'Четверг',
+    'пятница': 'Пятница',
+    'суббота': 'Суббота',
+    'воскресенье': 'Воскресенье'
+}
 DAYS_ORDER = {day.lower(): idx for idx, day in enumerate(DAYS_RU)}
 VALID_SUBGROUPS = ['1', '2', 'all']
 
@@ -103,15 +111,6 @@ def set_user_subgroup(user_id: int, subgroup: str):
     clear_schedule_cache(subgroup)
 
 
-def format_subgroup_mark(subgroup: str) -> str:
-    """Форматирование обозначения подгруппы"""
-    if subgroup == '1':
-        return " [1]"
-    elif subgroup == '2':
-        return " [2]"
-    return ""
-
-
 def format_subgroup_text(subgroup: str) -> str:
     """Форматирование текста подгруппы для списка"""
     if subgroup == 'all':
@@ -121,21 +120,6 @@ def format_subgroup_text(subgroup: str) -> str:
     elif subgroup == '2':
         return "2️⃣ (подгруппа 2)"
     return f"({subgroup})"
-
-
-async def get_day_schedule_message(day_ru: str, subgroup: str, day_type: str = "сегодня") -> str:
-    """Получить сообщение с расписанием на день"""
-    cached_data = get_cached_schedule(subgroup)
-    lessons = cached_data.get(day_ru, [])
-
-    if lessons:
-        message = f"📅 {safe_markdown_bold(day_ru)} (подгруппа {escape_markdown_v2(subgroup)}):\n\n"
-        for lesson in lessons:
-            message += f"• {lesson['time']} - {escape_markdown_v2(lesson['subject'])}{format_subgroup_mark(lesson.get('subgroup'))}\n"
-    else:
-        message = f"🎉 {safe_markdown_bold(day_ru)}\n{day_type.capitalize()} нет уроков для подгруппы {escape_markdown_v2(subgroup)}!"
-
-    return message
 
 
 # === КОМАНДЫ БОТА ===
@@ -166,43 +150,56 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(f"❌ Ошибка при запуске: {str(e)[:100]}")
 
 
-async def subgroup_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Команда выбора подгруппы: /subgroup"""
-    try:
-        user_id = update.effective_user.id
-        current_subgroup = get_user_subgroup(user_id)
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Помощь: /help - показывает все команды"""
+    help_text = (
+        "🆘 *СПРАВКА ПО КОМАНДАМ*\n\n"
 
-        keyboard = create_subgroup_selection_keyboard(current_subgroup)
-        await update.message.reply_text(
-            r"🎯 *Выберите вашу подгруппу:*\n\n"
-            r"• Подгруппа 1 \- ваши индивидуальные уроки\n"
-            r"• Подгруппа 2 \- уроки для второй подгруппы\n"
-            r"• Для всех \- общие уроки",
-            parse_mode='MarkdownV2',
-            reply_markup=keyboard
-        )
-    except Exception as e:
-        print(f"❌ ОШИБКА в subgroup_command: {e}")
-        import traceback
-        traceback.print_exc()
+        "🎯 *ВЫБОР ПОДГРУППЫ:*\n"
+        "`/subgroup_1` - Подгруппа 1\n"
+        "`/subgroup_2` - Подгруппа 2\n"
+        "`/subgroup_all` - Для всех подгрупп\n\n"
 
+        "📅 *РАСПИСАНИЕ ПО ДНЯМ:*\n"
+        "`/day_понедельник` - Понедельник\n"
+        "`/day_вторник` - Вторник\n"
+        "`/day_среда` - Среда\n"
+        "`/day_четверг` - Четверг\n"
+        "`/day_пятница` - Пятница\n"
+        "`/day_суббота` - Суббота\n"
+        "`/day_воскресенье` - Воскресенье\n\n"
 
-async def schedule_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Меню выбора дня: /schedule"""
-    try:
-        user_id = update.effective_user.id
-        subgroup = get_user_subgroup(user_id)
+        "📋 *ОСНОВНЫЕ КОМАНДЫ:*\n"
+        "`/start` - Начать работу с ботом\n"
+        "`/today` - Расписание на сегодня\n"
+        "`/tomorrow` - Расписание на завтра\n"
+        "`/week` - Вся неделя\n"
+        "`/all` - Все уроки в базе\n"
+        "`/schedule` - Показать список дней\n"
+        "`/subgroup` - Показать список подгрупп\n"
+        "`/help` - Эта справка\n\n"
 
-        keyboard = create_day_selection_keyboard(subgroup)
-        await update.message.reply_text(
-            f"📅 Выберите день \(подгруппа {escape_markdown_v2(subgroup)}\):",
-            parse_mode='MarkdownV2',
-            reply_markup=keyboard
-        )
-    except Exception as e:
-        print(f"❌ ОШИБКА в schedule_command: {e}")
-        import traceback
-        traceback.print_exc()
+        "➕ *ДОБАВЛЕНИЕ УРОКА:*\n"
+        "`/add Математика 10:00 Понедельник`\n"
+        "`/add Математика 10:00 Понедельник 1`\n"
+        "`/add Математика 10:00 Понедельник 2`\n"
+        "`/add Математика 10:00 Понедельник all`\n\n"
+
+        "🗑️ *УДАЛЕНИЕ УРОКА:*\n"
+        "`/delete 1` - Удалить урок с ID=1\n"
+        "После `/delete` используйте:\n"
+        "`/confirm_delete_1` - чтобы подтвердить\n"
+        "`/cancel` - чтобы отменить\n\n"
+
+        "⚙️ *ДОПОЛНИТЕЛЬНО:*\n"
+        "`/clearcache` - Очистить кэш\n\n"
+
+        "💡 *СОВЕТЫ:*\n"
+        "• Используйте кнопки внизу экрана\n"
+        "• Подгруппа: 1, 2 или all\n"
+        "• Дни: Понедельник-Воскресенье"
+    )
+    await update.message.reply_text(help_text, parse_mode='MarkdownV2')
 
 
 async def today_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -214,12 +211,22 @@ async def today_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         today_idx = datetime.datetime.now().weekday()
         today_ru = DAYS_RU[today_idx]
 
-        message = await get_day_schedule_message(today_ru, subgroup, "сегодня")
+        cached_data = get_cached_schedule(subgroup)
+        lessons = cached_data.get(today_ru, [])
+
+        if lessons:
+            message = f"📅 {safe_markdown_bold(today_ru)} (подгруппа {escape_markdown_v2(subgroup)}):\n\n"
+            for lesson in lessons:
+                message += f"• {lesson['time']} - {escape_markdown_v2(lesson['subject'])}\n"
+        else:
+            message = f"🎉 {safe_markdown_bold(today_ru)}\nСегодня нет уроков для подгруппы {escape_markdown_v2(subgroup)}!"
+
         await update.message.reply_text(message, parse_mode='MarkdownV2')
     except Exception as e:
         print(f"❌ ОШИБКА в today_command: {e}")
         import traceback
         traceback.print_exc()
+        await update.message.reply_text(f"❌ Ошибка: {str(e)[:100]}")
 
 
 async def tomorrow_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -231,66 +238,169 @@ async def tomorrow_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         tomorrow_idx = (datetime.datetime.now().weekday() + 1) % 7
         tomorrow_ru = DAYS_RU[tomorrow_idx]
 
-        message = await get_day_schedule_message(tomorrow_ru, subgroup, "завтра")
+        cached_data = get_cached_schedule(subgroup)
+        lessons = cached_data.get(tomorrow_ru, [])
+
+        if lessons:
+            message = f"📅 {safe_markdown_bold(tomorrow_ru)} (подгруппа {escape_markdown_v2(subgroup)}):\n\n"
+            for lesson in lessons:
+                message += f"• {lesson['time']} - {escape_markdown_v2(lesson['subject'])}\n"
+        else:
+            message = f"🎉 {safe_markdown_bold(tomorrow_ru)}\nЗавтра нет уроков для подгруппы {escape_markdown_v2(subgroup)}!"
+
         await update.message.reply_text(message, parse_mode='MarkdownV2')
     except Exception as e:
         print(f"❌ ОШИБКА в tomorrow_command: {e}")
         import traceback
         traceback.print_exc()
+        await update.message.reply_text(f"❌ Ошибка: {str(e)[:100]}")
 
 
-async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработка inline-кнопок - УПРОЩЕННАЯ ВЕРСИЯ"""
+async def week_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Расписание на всю неделю: /week"""
     try:
-        query = update.callback_query
-        await query.answer()
+        user_id = update.effective_user.id
+        subgroup = get_user_subgroup(user_id)
 
-        # Получаем данные
-        user_id = query.from_user.id
-        callback_data = query.data
+        cached_data = get_cached_schedule(subgroup)
+        message = format_full_schedule_by_days(cached_data)
+        message += f"\n\n🎯 *Подгруппа: {escape_markdown_v2(subgroup)}*"
 
-        print(f"🎯 КНОПКА НАЖАТА: user_id={user_id}, callback_data='{callback_data}'")
+        await update.message.reply_text(message, parse_mode='MarkdownV2')
+    except Exception as e:
+        print(f"❌ ОШИБКА в week_command: {e}")
+        import traceback
+        traceback.print_exc()
+        await update.message.reply_text(f"❌ Ошибка: {str(e)[:100]}")
 
-        # Простой ответ для ВСЕХ кнопок
-        response = f"✅ Нажата кнопка: {callback_data}"
 
-        if callback_data.startswith('subgroup_'):
-            subgroup = callback_data.replace('subgroup_', '')
-            if subgroup in ['1', '2', 'all']:
-                set_user_subgroup(user_id, subgroup)
-                response = f"✅ Выбрана подгруппа: {subgroup}"
+async def schedule_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Показать список дней: /schedule"""
+    try:
+        user_id = update.effective_user.id
+        subgroup = get_user_subgroup(user_id)
 
-        elif callback_data.startswith('day_'):
-            parts = callback_data.split('_')
-            if len(parts) >= 2:
-                day = parts[1]
-                subgroup = parts[2] if len(parts) > 2 else '1'
-                response = f"📅 Выбран день: {day}\n🎯 Подгруппа: {subgroup}"
-
-        elif callback_data.startswith('confirm_delete_'):
-            lesson_id = callback_data.replace('confirm_delete_', '')
-            response = f"🗑️ Удаление урока с ID: {lesson_id}"
-
-        elif callback_data in ['cancel', 'cancel_delete']:
-            response = "❌ Действие отменено"
-
-        # Отправляем ответ
-        await query.edit_message_text(
-            text=response,
+        days_list = get_days_list(subgroup)
+        await update.message.reply_text(
+            days_list,
             parse_mode='MarkdownV2'
+        )
+    except Exception as e:
+        print(f"❌ ОШИБКА в schedule_command: {e}")
+        import traceback
+        traceback.print_exc()
+        await update.message.reply_text(f"❌ Ошибка: {str(e)[:100]}")
+
+
+async def subgroup_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Показать список подгрупп: /subgroup"""
+    try:
+        subgroups_list = get_subgroups_list()
+        await update.message.reply_text(
+            subgroups_list,
+            parse_mode='MarkdownV2'
+        )
+    except Exception as e:
+        print(f"❌ ОШИБКА в subgroup_command: {e}")
+        import traceback
+        traceback.print_exc()
+        await update.message.reply_text(f"❌ Ошибка: {str(e)[:100]}")
+
+
+# === КОМАНДЫ ДЛЯ ДНЕЙ ===
+async def day_monday_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Расписание на понедельник: /day_понедельник"""
+    await handle_day_command(update, context, "Понедельник")
+
+
+async def day_tuesday_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Расписание на вторник: /day_вторник"""
+    await handle_day_command(update, context, "Вторник")
+
+
+async def day_wednesday_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Расписание на среду: /day_среда"""
+    await handle_day_command(update, context, "Среда")
+
+
+async def day_thursday_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Расписание на четверг: /day_четверг"""
+    await handle_day_command(update, context, "Четверг")
+
+
+async def day_friday_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Расписание на пятницу: /day_пятница"""
+    await handle_day_command(update, context, "Пятница")
+
+
+async def day_saturday_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Расписание на субботу: /day_суббота"""
+    await handle_day_command(update, context, "Суббота")
+
+
+async def day_sunday_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Расписание на воскресенье: /day_воскресенье"""
+    await handle_day_command(update, context, "Воскресенье")
+
+
+async def handle_day_command(update: Update, context: ContextTypes.DEFAULT_TYPE, day: str):
+    """Обработчик команд для дней"""
+    try:
+        user_id = update.effective_user.id
+        subgroup = get_user_subgroup(user_id)
+
+        cached_data = get_cached_schedule(subgroup)
+        lessons = cached_data.get(day, [])
+
+        if lessons:
+            message = f"📅 {safe_markdown_bold(day)} (подгруппа {escape_markdown_v2(subgroup)}):\n\n"
+            for lesson in lessons:
+                message += f"• {lesson['time']} - {escape_markdown_v2(lesson['subject'])}\n"
+        else:
+            message = f"🎉 {safe_markdown_bold(day)}\nНет уроков для подгруппы {escape_markdown_v2(subgroup)}!"
+
+        await update.message.reply_text(message, parse_mode='MarkdownV2')
+
+    except Exception as e:
+        print(f"❌ Ошибка в команде дня {day}: {e}")
+        await update.message.reply_text(f"❌ Ошибка: {str(e)[:100]}")
+
+
+# === КОМАНДЫ ПОДГРУПП ===
+async def subgroup_1_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Выбор подгруппы 1: /subgroup_1"""
+    await handle_subgroup_command(update, context, '1')
+
+
+async def subgroup_2_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Выбор подгруппы 2: /subgroup_2"""
+    await handle_subgroup_command(update, context, '2')
+
+
+async def subgroup_all_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Выбор 'для всех' подгрупп: /subgroup_all"""
+    await handle_subgroup_command(update, context, 'all')
+
+
+async def handle_subgroup_command(update: Update, context: ContextTypes.DEFAULT_TYPE, subgroup: str):
+    """Обработчик команд подгрупп"""
+    try:
+        user_id = update.effective_user.id
+        set_user_subgroup(user_id, subgroup)
+        keyboard = create_main_menu(subgroup)
+
+        await update.message.reply_text(
+            f"✅ Выбрана подгруппа: 🎯 {escape_markdown_v2(subgroup)}",
+            parse_mode='MarkdownV2',
+            reply_markup=keyboard
         )
 
     except Exception as e:
-        print(f"❌ ОШИБКА в button_callback: {e}")
-        import traceback
-        traceback.print_exc()
-        if update.callback_query:
-            await update.callback_query.edit_message_text(
-                text=f"❌ Ошибка: {str(e)[:100]}",
-                parse_mode='MarkdownV2'
-            )
+        print(f"❌ Ошибка в команде подгруппы {subgroup}: {e}")
+        await update.message.reply_text(f"❌ Ошибка: {str(e)[:100]}")
 
 
+# === КОМАНДЫ ДЛЯ РАБОТЫ С УРОКАМИ ===
 async def add_lesson_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Добавить урок: /add <предмет> <время> <день> [подгруппа]"""
     try:
@@ -336,6 +446,7 @@ async def add_lesson_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
         print(f"❌ ОШИБКА в add_lesson_command: {e}")
         import traceback
         traceback.print_exc()
+        await update.message.reply_text(f"❌ Ошибка: {str(e)[:100]}")
 
 
 async def delete_lesson_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -353,43 +464,53 @@ async def delete_lesson_command(update: Update, context: ContextTypes.DEFAULT_TY
                 await update.message.reply_text("❌ Урок не найден")
                 return
 
-            keyboard = create_confirmation_keyboard(lesson_id)
             message = r"🗑️ *Удалить урок?*\n\n"
             message += f"• Предмет: {escape_markdown_v2(lesson.get('subject', 'Неизвестно'))}\n"
             message += f"• Время: {escape_markdown_v2(lesson.get('time', 'Неизвестно'))}\n"
             message += f"• День: {escape_markdown_v2(lesson.get('day', 'Неизвестно'))}\n"
             if lesson.get('subgroup') != 'all':
                 message += f"• Подгруппа: {escape_markdown_v2(lesson.get('subgroup'))}\n"
-            message += f"• ID: {escape_markdown_v2(str(lesson.get('id', 'Неизвестно')))}"
+            message += f"• ID: {escape_markdown_v2(str(lesson.get('id', 'Неизвестно')))}\n\n"
+            message += f"📝 *Для подтверждения напишите:*\n"
+            message += f"`/confirm_delete_{lesson_id}` - удалить\n"
+            message += "`/cancel` - отменить"
 
-            await update.message.reply_text(
-                message,
-                parse_mode='MarkdownV2',
-                reply_markup=keyboard
-            )
+            await update.message.reply_text(message, parse_mode='MarkdownV2')
         except ValueError:
             await update.message.reply_text(r"❌ Введите правильный ID \(число\)", parse_mode='MarkdownV2')
     except Exception as e:
         print(f"❌ ОШИБКА в delete_lesson_command: {e}")
         import traceback
         traceback.print_exc()
+        await update.message.reply_text(f"❌ Ошибка: {str(e)[:100]}")
 
 
-async def week_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Расписание на всю неделю: /week"""
+async def confirm_delete_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Подтверждение удаления: /confirm_delete_<id>"""
     try:
-        user_id = update.effective_user.id
-        subgroup = get_user_subgroup(user_id)
+        command = update.message.text
+        if command.startswith('/confirm_delete_'):
+            lesson_id = int(command.replace('/confirm_delete_', ''))
 
-        cached_data = get_cached_schedule(subgroup)
-        message = format_full_schedule_by_days(cached_data)
-        message += f"\n\n🎯 *Подгруппа: {escape_markdown_v2(subgroup)}*"
+            lesson = db.get_lesson_by_id(lesson_id)
+            if lesson:
+                success = db.delete_lesson(lesson_id)
+                if success:
+                    clear_schedule_cache()
+                    await update.message.reply_text(f"✅ Урок #{lesson_id} удален")
+                else:
+                    await update.message.reply_text("❌ Ошибка при удалении")
+            else:
+                await update.message.reply_text("❌ Урок не найден")
 
-        await update.message.reply_text(message, parse_mode='MarkdownV2')
     except Exception as e:
-        print(f"❌ ОШИБКА в week_command: {e}")
-        import traceback
-        traceback.print_exc()
+        print(f"❌ Ошибка в подтверждении удаления: {e}")
+        await update.message.reply_text(f"❌ Ошибка: {str(e)[:100]}")
+
+
+async def cancel_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Отмена действия: /cancel"""
+    await update.message.reply_text("❌ Действие отменено")
 
 
 async def all_lessons_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -443,44 +564,6 @@ async def all_lessons_command(update: Update, context: ContextTypes.DEFAULT_TYPE
                                         parse_mode='MarkdownV2')
 
 
-async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Помощь: /help"""
-    try:
-        help_text = (
-            r"🆘 *Справка по командам с поддержкой подгрупп*\n\n"
-            r"🎯 *Работа с подгруппами:*\n"
-            r"/subgroup \- Выбрать подгруппу \(1, 2 или all\)\n"
-            r"🔄 Подгруппа сохраняется для каждого пользователя отдельно\n\n"
-            r"📅 *Просмотр расписания \(для выбранной подгруппы\):*\n"
-            r"/schedule \- Выбрать день недели\n"
-            r"/today \- Расписание на сегодня\n"
-            r"/tomorrow \- Расписание на завтра\n"
-            r"/week \- Вся неделя\n"
-            r"/all \- Все уроки в базе\n\n"
-            r"➕ *Добавление урока \(с указанием подгруппы\):*\n"
-            r"`/add <предмет> <время> <день> \[подгруппа\]`\n\n"
-            r"*Примеры:*\n"
-            r"• `/add Математика 10:00 Понедельник` \- для всех\n"
-            r"• `/add Математика 10:00 Понедельник 1` \- для подгруппы 1\n"
-            r"• `/add Математика 10:00 Понедельник 2` \- для подгруппы 2\n"
-            r"• `/add Математика 10:00 Понедельник all` \- для всех подгрупп\n\n"
-            r"🗑️ *Удаление:*\n"
-            r"/delete <ID\_урока> \- Удалить урок\n\n"
-            r"💡 *Советы:*\n"
-            r"• Используйте кнопки для быстрого доступа\n"
-            r"• ID урока можно увидеть в расписании\n"
-            r"• Подгруппа: 1, 2 или all \(для всех\)\n"
-            r"• Дни: Понедельник\-Воскресенье"
-        )
-        await update.message.reply_text(help_text, parse_mode='MarkdownV2')
-    except Exception as e:
-        print(f"❌ ОШИБКА в help_command: {e}")
-        import traceback
-        traceback.print_exc()
-        if update and update.message:
-            await update.message.reply_text(f"❌ Ошибка в справке: {str(e)[:100]}")
-
-
 async def clear_cache_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Очистка кэша: /clearcache"""
     try:
@@ -490,28 +573,26 @@ async def clear_cache_command(update: Update, context: ContextTypes.DEFAULT_TYPE
         print(f"❌ ОШИБКА в clear_cache_command: {e}")
         import traceback
         traceback.print_exc()
+        await update.message.reply_text(f"❌ Ошибка: {str(e)[:100]}")
 
 
-async def test_buttons_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Тестовая команда для проверки кнопок"""
+# === ОБРАБОТЧИК ДЛЯ ДИНАМИЧЕСКИХ КОМАНД ===
+async def dynamic_day_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработчик для /day_<день>"""
     try:
-        user_id = update.effective_user.id
-        subgroup = get_user_subgroup(user_id)
+        command = update.message.text.lower().replace('/', '')
 
-        # Создаем тестовую клавиатуру с ОДНОЙ кнопкой
-        keyboard = InlineKeyboardMarkup([[
-            InlineKeyboardButton("🎯 Тестовая кнопка", callback_data="test_button")
-        ]])
-
-        await update.message.reply_text(
-            "🔄 Тест кнопок\n\nНажмите на кнопку ниже:",
-            reply_markup=keyboard
-        )
+        if command.startswith('day_'):
+            day_key = command.replace('day_', '')
+            if day_key in DAYS_COMMANDS:
+                await handle_day_command(update, context, DAYS_COMMANDS[day_key])
+            else:
+                await update.message.reply_text(f"❌ Неизвестный день: {day_key}")
 
     except Exception as e:
-        print(f"❌ ОШИБКА в test_buttons_command: {e}")
-        import traceback
-        traceback.print_exc()
+        print(f"❌ Ошибка в динамической команде дня: {e}")
+        await update.message.reply_text(f"❌ Ошибка: {str(e)[:100]}")
+
 
 def main():
     """Запуск бота"""
@@ -540,35 +621,56 @@ def main():
 
         application.add_error_handler(error_handler)
 
-        # Регистрация команд
-        commands = [
+        # Регистрация ОСНОВНЫХ команд
+        basic_commands = [
             ("start", start_command),
-            ("subgroup", subgroup_command),
+            ("help", help_command),
             ("today", today_command),
             ("tomorrow", tomorrow_command),
-            ("schedule", schedule_command),
             ("week", week_command),
+            ("schedule", schedule_command),
+            ("subgroup", subgroup_command),
             ("all", all_lessons_command),
-            ("help", help_command),
             ("add", add_lesson_command),
             ("delete", delete_lesson_command),
             ("clearcache", clear_cache_command),
-            ("test", test_buttons_command)
+            ("cancel", cancel_command),
         ]
 
-        for command, handler in commands:
+        # Регистрация команд ДНЕЙ
+        day_commands = [
+            ("day_понедельник", day_monday_command),
+            ("day_вторник", day_tuesday_command),
+            ("day_среда", day_wednesday_command),
+            ("day_четверг", day_thursday_command),
+            ("day_пятница", day_friday_command),
+            ("day_суббота", day_saturday_command),
+            ("day_воскресенье", day_sunday_command),
+        ]
+
+        # Регистрация команд ПОДГРУПП
+        subgroup_commands = [
+            ("subgroup_1", subgroup_1_command),
+            ("subgroup_2", subgroup_2_command),
+            ("subgroup_all", subgroup_all_command),
+        ]
+
+        # Регистрируем все статические команды
+        all_commands = basic_commands + day_commands + subgroup_commands
+        for command, handler in all_commands:
             application.add_handler(CommandHandler(command, handler))
 
-        # Обработчик кнопок
-        application.add_handler(CallbackQueryHandler(button_callback))
+        # Регистрируем динамические команды (confirm_delete_*)
+        application.add_handler(MessageHandler(
+            filters.Regex(r'^/confirm_delete_\d+$'),
+            confirm_delete_command
+        ))
 
-        print("⚡ Функции:")
-        print("  • Поддержка 2 подгрупп и общих уроков")
-        print("  • Кэширование для каждой подгруппы отдельно")
-        print("  • Персональные настройки подгруппы для каждого пользователя")
-        print("  • Вывод всех уроков командой /all")
+        print("✅ Бот настроен со следующими командами:")
+        for cmd, _ in all_commands:
+            print(f"   • /{cmd}")
         print("\n📝 Напишите /start в Telegram")
-        print("🎯 Используйте /subgroup для выбора подгруппы")
+        print("❓ Напишите /help для списка всех команд")
 
         try:
             application.run_polling(

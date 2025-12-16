@@ -16,7 +16,15 @@ def safe_markdown_bold(text: str) -> str:
 
 # === КОНСТАНТЫ ===
 DAYS_FULL = ["Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота", "Воскресенье"]
-DAYS_SHORT = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"]
+DAYS_COMMANDS = {
+    'понедельник': 'Понедельник',
+    'вторник': 'Вторник',
+    'среда': 'Среда',
+    'четверг': 'Четверг',
+    'пятница': 'Пятница',
+    'суббота': 'Суббота',
+    'воскресенье': 'Воскресенье'
+}
 
 DAY_EMOJIS = {
     'Понедельник': '📅', 'Вторник': '📅', 'Среда': '📅', 'Четверг': '📅',
@@ -29,70 +37,107 @@ DAY_NUMBER_EMOJIS = {
 }
 
 SUBGROUP_TEXTS = {
-    '1': "🎯 \(подгруппа 1\)",
-    '2': "🎯 \(подгруппа 2\)",
-    'all': "👥 \(для всех подгрупп\)",
-    'common': "👥 \(для всех\)"
+    '1': "🎯 (подгруппа 1)",
+    '2': "🎯 (подгруппа 2)",
+    'all': "👥 (для всех подгрупп)"
 }
 
-# === ОСНОВНЫЕ СООБЩЕНИЯ ===
-WELCOME_MESSAGE = """
-👋 Добро пожаловать в бот\-расписание с поддержкой подгрупп\!
 
-🎯 *Особенности:*
-• Поддержка 2 подгрупп \+ общие уроки
-• Индивидуальное расписание для каждой подгруппы
-• Гибкое переключение между подгруппами
-• Фильтрация уроков по подгруппам
+# === СПРАВОЧНЫЕ СООБЩЕНИЯ ===
+def get_help_message() -> str:
+    """Полное сообщение помощи"""
+    return (
+        "🆘 *СПРАВКА ПО КОМАНДАМ*\n\n"
 
-📌 *Начните с выбора подгруппы:* /subgroup
-"""
+        "🎯 *ВЫБОР ПОДГРУППЫ:*\n"
+        "`/subgroup_1` - Подгруппа 1\n"
+        "`/subgroup_2` - Подгруппа 2\n"
+        "`/subgroup_all` - Для всех подгрупп\n\n"
 
-HELP_MESSAGE = """
-🆘 *Справка по командам с поддержкой подгрупп*
+        "📅 *РАСПИСАНИЕ ПО ДНЯМ:*\n"
+        "`/day_понедельник` - Понедельник\n"
+        "`/day_вторник` - Вторник\n"
+        "`/day_среда` - Среда\n"
+        "`/day_четверг` - Четверг\n"
+        "`/day_пятница` - Пятница\n"
+        "`/day_суббота` - Суббота\n"
+        "`/day_воскресенье` - Воскресенье\n\n"
 
-🎯 *Работа с подгруппами:*
-/subgroup \- Выбрать подгруппу \(1, 2 или all\)
-🔄 Подгруппа сохраняется для каждого пользователя отдельно
+        "📋 *ОСНОВНЫЕ КОМАНДЫ:*\n"
+        "`/start` - Начать работу с ботом\n"
+        "`/today` - Расписание на сегодня\n"
+        "`/tomorrow` - Расписание на завтра\n"
+        "`/week` - Вся неделя\n"
+        "`/all` - Все уроки в базе\n"
+        "`/schedule` - Показать список дней\n"
+        "`/subgroup` - Показать список подгрупп\n"
+        "`/help` - Эта справка\n\n"
 
-📅 *Просмотр расписания \(для выбранной подгруппы\):*
-/schedule \- Выбрать день недели
-/today \- Расписание на сегодня
-/tomorrow \- Расписание на завтра  
-/week \- Вся неделя
-/stats \- Статистика по подгруппе
+        "➕ *ДОБАВЛЕНИЕ УРОКА:*\n"
+        "`/add Математика 10:00 Понедельник`\n"
+        "`/add Математика 10:00 Понедельник 1`\n"
+        "`/add Математика 10:00 Понедельник 2`\n"
+        "`/add Математика 10:00 Понедельник all`\n\n"
 
-➕ *Добавление урока \(с указанием подгруппы\):*
-`/add <предмет> <время> <день> \[подгруппа\]`
+        "🗑️ *УДАЛЕНИЕ УРОКА:*\n"
+        "`/delete 1` - Удалить урок с ID=1\n"
+        "После `/delete` используйте:\n"
+        "`/confirm_delete_1` - чтобы подтвердить\n"
+        "`/cancel` - чтобы отменить\n\n"
 
-*Примеры:*
-• `/add Математика 10:00 Понедельник` \- для всех
-• `/add Математика 10:00 Понедельник 1` \- для подгруппы 1
-• `/add Математика 10:00 Понедельник 2` \- для подгруппы 2
-• `/add Математика 10:00 Понедельник all` \- для всех подгрупп
+        "⚙️ *ДОПОЛНИТЕЛЬНО:*\n"
+        "`/clearcache` - Очистить кэш\n\n"
 
-🗑️ *Удаление:*
-/delete <ID\_урока> \- Удалить урок
-/clear <день> \- Очистить весь день
+        "💡 *СОВЕТЫ:*\n"
+        "• Используйте кнопки внизу экрана\n"
+        "• Подгруппа: 1, 2 или all\n"
+        "• Дни: Понедельник-Воскресенье"
+    )
 
-📊 *Аналитика:*
-/stats \- Статистика для текущей подгруппы
 
-💡 *Советы:*
-• Используйте кнопки для быстрого доступа
-• ID урока можно увидеть в расписании
-• Подгруппа: 1, 2 или all \(для всех\)
-• Дни: Понедельник\-Воскресенье
-"""
+def get_welcome_message(subgroup: str = '1') -> str:
+    """Приветственное сообщение"""
+    subgroup_text = SUBGROUP_TEXTS.get(subgroup, f"подгруппа {subgroup}")
+    return (
+        f"👋 Добро пожаловать в бот-расписание!\n\n"
+        f"🎯 *Текущая подгруппа:* {subgroup_text}\n\n"
+        f"📌 *Быстрый старт:*\n"
+        f"1. Посмотреть расписание: `/today` или `/week`\n"
+        f"2. Сменить подгруппу: `/subgroup_1`, `/subgroup_2`, `/subgroup_all`\n"
+        f"3. Добавить урок: `/add Математика 10:00 Понедельник`\n\n"
+        f"❓ Полный список команд: `/help`"
+    )
+
+
+def get_days_list_message(subgroup: str = '1') -> str:
+    """Сообщение со списком дней"""
+    message = "📅 *Доступные команды для дней:*\n\n"
+    for day_command, day_name in DAYS_COMMANDS.items():
+        message += f"• `/day_{day_command}` - {day_name}\n"
+    message += f"\n✨ Пример: `/day_понедельник`\n"
+    message += f"🎯 Текущая подгруппа: {subgroup}"
+    return message
+
+
+def get_subgroups_list_message() -> str:
+    """Сообщение со списком подгрупп"""
+    return (
+        "🎯 *Доступные команды подгрупп:*\n\n"
+        "• `/subgroup_1` - Подгруппа 1\n"
+        "• `/subgroup_2` - Подгруппа 2\n"
+        "• `/subgroup_all` - Для всех подгрупп\n\n"
+        "✨ *Пример:* `/subgroup_1`\n"
+        "🔄 Подгруппа сохраняется индивидуально для каждого пользователя"
+    )
 
 
 # === УТИЛИТНЫЕ ФУНКЦИИ ===
 def _get_subgroup_mark(subgroup: str) -> str:
     """Получить маркер подгруппы"""
     if subgroup == '1':
-        return " \[1\]"
+        return " [1]"
     elif subgroup == '2':
-        return " \[2\]"
+        return " [2]"
     return ""
 
 
@@ -108,24 +153,6 @@ def _format_lessons_by_subgroup(lessons: list) -> dict:
     return grouped
 
 
-def _format_subgroup_stats(grouped_lessons: dict) -> tuple:
-    """Форматировать статистику по подгруппам"""
-    counts = []
-    stats = []
-
-    if grouped_lessons['all']:
-        counts.append(f"всех: {escape_markdown_v2(str(len(grouped_lessons['all'])))}")
-        stats.append(f"👥 всех: {escape_markdown_v2(str(len(grouped_lessons['all'])))}")
-    if grouped_lessons['1']:
-        counts.append(f"подгр\.1: {escape_markdown_v2(str(len(grouped_lessons['1'])))}")
-        stats.append(f"🎯 1: {escape_markdown_v2(str(len(grouped_lessons['1'])))}")
-    if grouped_lessons['2']:
-        counts.append(f"подгр\.2: {escape_markdown_v2(str(len(grouped_lessons['2'])))}")
-        stats.append(f"🎯 2: {escape_markdown_v2(str(len(grouped_lessons['2'])))}")
-
-    return counts, stats
-
-
 # === ФОРМАТИРОВАНИЕ УРОКОВ ===
 def format_lesson_message(lesson: dict) -> str:
     """Форматировать информацию об уроке"""
@@ -135,11 +162,7 @@ def format_lesson_message(lesson: dict) -> str:
     subgroup = lesson.get('subgroup', 'all')
     lesson_id = escape_markdown_v2(str(lesson.get('id', '?')))
 
-    subgroup_text = {
-        '1': "🎯 Подгруппа: 1",
-        '2': "🎯 Подгруппа: 2",
-        'all': "👥 Для всех подгрупп"
-    }.get(subgroup, f"Подгруппа: {escape_markdown_v2(subgroup)}")
+    subgroup_text = SUBGROUP_TEXTS.get(subgroup, f"Подгруппа: {escape_markdown_v2(subgroup)}")
 
     return f"""📚 {safe_markdown_bold(subject)}
 🕗 Время: {time}
@@ -152,7 +175,7 @@ def format_lesson_short(lesson: dict) -> str:
     """Краткая информация об уроке"""
     time_str = escape_markdown_v2(lesson.get('time', '--:--'))
     subject_str = escape_markdown_v2(lesson.get('subject', 'Без названия'))
-    return f"• {time_str} \- {subject_str}{_get_subgroup_mark(lesson.get('subgroup', 'all'))}"
+    return f"• {time_str} - {subject_str}{_get_subgroup_mark(lesson.get('subgroup', 'all'))}"
 
 
 # === ФОРМАТИРОВАНИЕ РАСПИСАНИЯ ===
@@ -160,7 +183,7 @@ def format_day_schedule(day: str, lessons: list) -> str:
     """Форматировать расписание для дня"""
     safe_day = escape_markdown_v2(day)
     if not lessons:
-        return f"📅 {safe_markdown_bold(day)}\n\n🎉 На этот день нет запланированных уроков\!"
+        return f"📅 {safe_markdown_bold(day)}\n\n🎉 На этот день нет запланированных уроков!"
 
     emoji = DAY_EMOJIS.get(day, '📅')
     grouped = _format_lessons_by_subgroup(lessons)
@@ -174,7 +197,7 @@ def format_day_schedule(day: str, lessons: list) -> str:
         for i, lesson in enumerate(grouped['all'], 1):
             subject = escape_markdown_v2(lesson.get('subject', 'Без названия'))
             time = escape_markdown_v2(lesson.get('time', '--:--'))
-            message += f"  {escape_markdown_v2(str(i))}\. {time} \- {subject}\n"
+            message += f"  {escape_markdown_v2(str(i))}. {time} - {subject}\n"
         total_lessons += len(grouped['all'])
         if grouped['1'] or grouped['2']:
             message += "\n"
@@ -185,7 +208,7 @@ def format_day_schedule(day: str, lessons: list) -> str:
         for i, lesson in enumerate(grouped['1'], 1):
             subject = escape_markdown_v2(lesson.get('subject', 'Без названия'))
             time = escape_markdown_v2(lesson.get('time', '--:--'))
-            message += f"  {escape_markdown_v2(str(i))}\. {time} \- {subject}\n"
+            message += f"  {escape_markdown_v2(str(i))}. {time} - {subject}\n"
         total_lessons += len(grouped['1'])
         if grouped['2']:
             message += "\n"
@@ -196,13 +219,20 @@ def format_day_schedule(day: str, lessons: list) -> str:
         for i, lesson in enumerate(grouped['2'], 1):
             subject = escape_markdown_v2(lesson.get('subject', 'Без названия'))
             time = escape_markdown_v2(lesson.get('time', '--:--'))
-            message += f"  {escape_markdown_v2(str(i))}\. {time} \- {subject}\n"
+            message += f"  {escape_markdown_v2(str(i))}. {time} - {subject}\n"
         total_lessons += len(grouped['2'])
 
     message += f"\n📊 Всего уроков: {safe_markdown_bold(str(total_lessons))}"
 
     # Статистика по подгруппам
-    counts, _ = _format_subgroup_stats(grouped)
+    counts = []
+    if grouped['all']:
+        counts.append(f"всех: {escape_markdown_v2(str(len(grouped['all'])))}")
+    if grouped['1']:
+        counts.append(f"1: {escape_markdown_v2(str(len(grouped['1'])))}")
+    if grouped['2']:
+        counts.append(f"2: {escape_markdown_v2(str(len(grouped['2'])))}")
+
     if counts:
         message += f"\n📈 Распределение: {', '.join(counts)}"
 
@@ -212,7 +242,7 @@ def format_day_schedule(day: str, lessons: list) -> str:
 def format_full_schedule_by_days(days_data: dict) -> str:
     """Форматировать полное расписание"""
     if not days_data or not any(lessons for lessons in days_data.values()):
-        return "📋 *Ваше расписание*\n\n📭 Расписание пустое\!\n\nИспользуйте /add чтобы добавить уроки\."
+        return "📋 *Ваше расписание*\n\n📭 Расписание пустое!\n\nИспользуйте /add чтобы добавить уроки."
 
     message = "📋 *Ваше расписание на неделю*\n"
     total_lessons = 0
@@ -244,7 +274,7 @@ def format_full_schedule_by_days(days_data: dict) -> str:
                 day_counts.append(f"2: {escape_markdown_v2(str(len(grouped['2'])))}")
 
             safe_day = escape_markdown_v2(day)
-            count_str = f" \({', '.join(day_counts)}\)" if day_counts else ""
+            count_str = f" ({', '.join(day_counts)})" if day_counts else ""
             message += f"\n{emoji} {safe_markdown_bold(day)}{count_str}:\n"
 
             for lesson in lessons:
@@ -270,7 +300,7 @@ def format_full_schedule_by_days(days_data: dict) -> str:
 def format_week_overview(days_with_lessons: list) -> str:
     """Краткий обзор недели"""
     if not days_with_lessons:
-        return "📭 На этой неделе нет уроков\. Добавьте первый урок командой /add"
+        return "📭 На этой неделе нет уроков. Добавьте первый урок командой /add"
 
     sorted_days = [day for day in DAYS_FULL if day in days_with_lessons]
 
@@ -284,235 +314,79 @@ def format_week_overview(days_with_lessons: list) -> str:
     return message
 
 
-# === СТАТИСТИКА ===
-def format_stats_message(stats: dict) -> str:
-    """Форматировать статистику"""
-    subgroup = stats.get('subgroup', 'all')
-    subgroup_text = SUBGROUP_TEXTS.get(subgroup, '')
-    message = f"📊 *Статистика вашего расписания {subgroup_text}*\n\n"
-
-    message += f"• Всего уроков: {safe_markdown_bold(str(stats.get('total_lessons', 0)))}\n"
-    message += f"• Дней с уроками: {safe_markdown_bold(str(stats.get('days_with_lessons', 0)))}\n"
-    message += f"• Разных предметов: {safe_markdown_bold(str(stats.get('subjects_count', 0)))}\n"
-
-    if stats.get('most_busy_day'):
-        safe_day = escape_markdown_v2(stats['most_busy_day'])
-        message += f"• Самый загруженный день: {safe_markdown_bold(safe_day)}\n"
-
-    # Статистика по дням
-    lessons_by_day = stats.get('lessons_by_day', {})
-    if lessons_by_day:
-        message += "\n📅 *Уроков по дням:*\n"
-        for day in DAYS_FULL:
-            if day in lessons_by_day:
-                count = lessons_by_day[day]
-                bars = "█" * min(count, 10)
-                safe_day_short = escape_markdown_v2(day[:3])
-                safe_count = escape_markdown_v2(str(count))
-                message += f"{safe_day_short}: {bars} {safe_count}\n"
-
-    return message
-
-
-# === СПЕЦИАЛЬНЫЕ СООБЩЕНИЯ ===
-def format_clear_day_message(day: str, deleted_lessons: list) -> str:
-    """Сообщение об очистке дня"""
-    safe_day = escape_markdown_v2(day)
-    if not deleted_lessons:
-        return f"📅 В {safe_markdown_bold(day)} не было уроков для удаления\."
-
-    grouped = _format_lessons_by_subgroup(deleted_lessons)
-    message = f"🗑️ *Удалено из {safe_day}:*\n\n"
-
-    total_deleted = 0
-
-    # Форматирование удаленных уроков
-    for subgroup_name, title in [('all', '👥 *Для всех подгрупп:*'),
-                                 ('1', '🎯 *Подгруппа 1:*'),
-                                 ('2', '🎯 *Подгруппа 2:*')]:
-        if grouped[subgroup_name]:
-            message += f"{title}\n"
-            for i, lesson in enumerate(grouped[subgroup_name], 1):
-                subject = escape_markdown_v2(lesson.get('subject', 'Без названия'))
-                time = escape_markdown_v2(lesson.get('time', '--:--'))
-                message += f"  {escape_markdown_v2(str(i))}\. {subject} в {time}\n"
-            total_deleted += len(grouped[subgroup_name])
-            if subgroup_name != '2':
-                message += "\n"
-
-    # Статистика
-    counts, _ = _format_subgroup_stats(grouped)
-    message += f"\n✅ Всего удалено: {safe_markdown_bold(str(total_deleted))} уроков"
-
-    if counts:
-        message += f"\n📈 Распределение: {', '.join(counts)}"
-
-    return message
-
-
-def format_today_tomorrow_message(day_type: str, day_name: str, lessons: list, subgroup: str = 'all') -> str:
-    """Сообщение для сегодня/завтра"""
-    day_text = "сегодня" if day_type == "today" else "завтра"
-    subgroup_text = SUBGROUP_TEXTS.get(subgroup, '')
-    safe_day_name = escape_markdown_v2(day_name)
-
+# === СООБЩЕНИЯ ДЛЯ КОМАНД ===
+def format_day_command_response(day: str, lessons: list, subgroup: str) -> str:
+    """Форматировать ответ для команды дня"""
     if not lessons:
-        if day_type == "today":
-            return f"🎉 {safe_markdown_bold(day_name)} {subgroup_text}\n\nСегодня нет уроков для выбранной подгруппы\! 🌟"
-        else:
-            return f"📅 {safe_markdown_bold(day_name)} {subgroup_text}\n\nЗавтра нет уроков для выбранной подгруппы\! 😊"
+        return f"📅 {safe_markdown_bold(day)}\n\n🎉 Нет уроков для подгруппы {escape_markdown_v2(subgroup)}!"
 
-    grouped = _format_lessons_by_subgroup(lessons)
-    message = f"📅 *Расписание на {day_text} \({safe_day_name}\) {subgroup_text}:*\n\n"
-    total_lessons = 0
+    subgroup_text = SUBGROUP_TEXTS.get(subgroup, f"подгруппа {escape_markdown_v2(subgroup)}")
+    message = f"📅 {safe_markdown_bold(day)} {subgroup_text}\n\n"
 
-    # Форматирование по подгруппам
-    for subgroup_name, title in [('all', '👥 *Для всех подгрупп:*'),
-                                 ('1', '🎯 *Подгруппа 1:*'),
-                                 ('2', '🎯 *Подгруппа 2:*')]:
-        if grouped[subgroup_name]:
-            message += f"{title}\n"
-            for i, lesson in enumerate(grouped[subgroup_name], 1):
-                subject = escape_markdown_v2(lesson.get('subject', 'Без названия'))
-                time = escape_markdown_v2(lesson.get('time', '--:--'))
-                message += f"  {escape_markdown_v2(str(i))}\. {time} \- {subject}\n"
-            total_lessons += len(grouped[subgroup_name])
-            message += "\n"
+    for i, lesson in enumerate(lessons, 1):
+        subject = escape_markdown_v2(lesson.get('subject', 'Без названия'))
+        time = escape_markdown_v2(lesson.get('time', '--:--'))
+        message += f"{escape_markdown_v2(str(i))}. {time} - {subject}\n"
 
-    message = message.rstrip("\n") + f"\n\n📊 Всего уроков: {safe_markdown_bold(str(total_lessons))}"
+    message += f"\n📊 Всего уроков: {safe_markdown_bold(str(len(lessons)))}"
+    return message
 
-    # Информация о распределении
-    if subgroup == 'all':
-        _, stats = _format_subgroup_stats(grouped)
-        if stats:
-            message += f"\n📈 Распределение: {', '.join(stats)}"
+
+def format_subgroup_changed_message(subgroup: str) -> str:
+    """Сообщение об изменении подгруппы"""
+    subgroup_text = SUBGROUP_TEXTS.get(subgroup, f"подгруппа {escape_markdown_v2(subgroup)}")
+    return f"✅ Выбрана {subgroup_text}\n\nТеперь вы будете видеть уроки только для этой подгруппы."
+
+
+def format_delete_confirmation_message(lesson: dict) -> str:
+    """Сообщение подтверждения удаления"""
+    subject = escape_markdown_v2(lesson.get('subject', 'Неизвестно'))
+    time = escape_markdown_v2(lesson.get('time', 'Неизвестно'))
+    day = escape_markdown_v2(lesson.get('day', 'Неизвестно'))
+    subgroup = lesson.get('subgroup', 'all')
+    lesson_id = escape_markdown_v2(str(lesson.get('id', 'Неизвестно')))
+
+    subgroup_text = SUBGROUP_TEXTS.get(subgroup, f"подгруппа {escape_markdown_v2(subgroup)}")
+
+    message = "🗑️ *Удалить урок?*\n\n"
+    message += f"• Предмет: {subject}\n"
+    message += f"• Время: {time}\n"
+    message += f"• День: {day}\n"
+    message += f"• Подгруппа: {subgroup_text}\n"
+    message += f"• ID: {lesson_id}\n\n"
+    message += f"📝 *Для подтверждения напишите:*\n"
+    message += f"`/confirm_delete_{lesson.get('id', '')}` - удалить\n"
+    message += "`/cancel` - отменить"
 
     return message
 
 
-# === ИНСТРУКЦИИ ===
-def format_instruction_message(command: str) -> str:
-    """Инструкция по команде"""
-    instructions = {
-        'add': """
-➕ *Как добавить урок \(с поддержкой подгрупп\):*
-
-*Базовый формат:*
-`/add <предмет> <время> <день> \[подгруппа\]`
-
-*Примеры:*
-• `/add Математика 10:00 Понедельник` \- для всех
-• `/add Математика 10:00 Понедельник 1` \- для подгруппы 1
-• `/add Математика 10:00 Понедельник 2` \- для подгруппы 2
-• `/add Математика 10:00 Понедельник all` \- для всех подгрупп
-
-*Примечания:*
-• Время в формате ЧЧ:ММ \(24\-часовой\)
-• День: Понедельник, Вторник и т\.д\.
-• Подгруппа: 1, 2 или all \(по умолчанию: all\)
-• Можно использовать сокращения дней: Пн, Вт, Ср
-        """,
-        'delete': """
-🗑️ *Как удалить урок:*
-1\. Посмотрите ID урока в расписании
-2\. Используйте команду:
-`/delete <ID\_урока>`
-
-*Пример:*
-`/delete 5`
-
-*Или:* Используйте кнопку "Удалить урок" в меню
-        """,
-        'schedule': """
-📅 *Как посмотреть расписание \(с подгруппами\):*
-
-*Команды \(показывают для выбранной подгруппы\):*
-• `/today` \- на сегодня
-• `/tomorrow` \- на завтра  
-• `/week` \- вся неделя
-• `/schedule` \- выбрать день
-• `/stats` \- статистика
-
-*Смена подгруппы:*
-• `/subgroup` \- выбрать подгруппу \(1, 2, all\)
-• Подгруппа сохраняется индивидуально
-
-*Или:* Используйте кнопки в меню
-        """,
-        'subgroup': """
-🎯 *Как работать с подгруппами:*
-
-*Выбор подгруппы:*
-• `/subgroup` \- открыть меню выбора
-• Каждый пользователь выбирает свою подгруппу
-• Подгруппа сохраняется между сессиями
-
-*Доступные варианты:*
-• 🎯 Подгруппа 1 \- только ваши уроки
-• 🎯 Подгруппа 2 \- уроки второй подгруппы  
-• 👥 Для всех \- общие уроки
-
-*Добавление уроков:*
-При добавлении укажите подгруппу в конце:
-`/add Математика 10:00 Понедельник 1`
-        """
-    }
-    return instructions.get(command, "📖 Инструкция по команде")
+def format_add_instruction_message() -> str:
+    """Инструкция по добавлению урока"""
+    return (
+        "📝 *Формат:* `/add <предмет> <время> <день> [подгруппа]`\n\n"
+        "📌 *Примеры:*\n"
+        "• `/add Математика 10:00 Понедельник` - для всех\n"
+        "• `/add Математика 10:00 Понедельник 1` - для подгруппы 1\n"
+        "• `/add Математика 10:00 Понедельник 2` - для подгруппы 2\n"
+        "• `/add Математика 10:00 Понедельник all` - для всех подгрупп\n\n"
+        "⚠️ *Подгруппа по умолчанию:* `all`"
+    )
 
 
-def format_subgroup_selection_message(current_subgroup: str = '1') -> str:
-    """Сообщение для выбора подгруппы"""
-    current_text = {
-        '1': '🎯 Подгруппа 1',
-        '2': '🎯 Подгруппа 2',
-        'all': '👥 Для всех подгрупп'
-    }.get(current_subgroup, f'Подгруппа {escape_markdown_v2(current_subgroup)}')
-
-    return f"""
-🎯 *Выбор подгруппы*
-
-Текущая: {current_text}
-
-*Доступные варианты:*
-• 🎯 Подгруппа 1 \- только ваши индивидуальные уроки
-• 🎯 Подгруппа 2 \- уроки для второй подгруппы
-• 👥 Для всех \- общие уроки для всех подгрупп
-
-*Как это работает:*
-1\. Вы выбираете подгруппу
-2\. Бот показывает только уроки для этой подгруппы
-3\. При добавлении урока можно указать подгруппу
-4\. Каждый пользователь выбирает свою подгруппу
-
-Выберите вашу подгруппу:
-"""
-
-
-# === УТИЛИТНЫЕ СООБЩЕНИЯ ===
-def format_success_message(action: str, details: str = "", subgroup: str = None) -> str:
+# === СООБЩЕНИЯ ОБ УСПЕХЕ/ОШИБКАХ ===
+def format_success_message(action: str, details: str = "") -> str:
     """Сообщение об успехе"""
     safe_details = escape_markdown_v2(details)
 
     messages = {
-        'add': f"✅ Урок успешно добавлен\!\n{safe_details}",
-        'delete': f"✅ Урок успешно удален\!\n{safe_details}",
-        'update': f"✅ Урок успешно обновлен\!\n{safe_details}",
-        'clear': f"✅ День успешно очищен\!\n{safe_details}",
-        'save': f"✅ Изменения сохранены\!\n{safe_details}",
-        'subgroup_changed': f"✅ Подгруппа изменена\!\n{safe_details}"
+        'add': f"✅ Урок успешно добавлен!\n{safe_details}",
+        'delete': f"✅ Урок успешно удален!\n{safe_details}",
+        'subgroup_changed': f"✅ Подгруппа изменена!\n{safe_details}",
+        'cache_cleared': "✅ Кэш расписания очищен"
     }
 
-    message = messages.get(action, f"✅ Действие выполнено успешно\!\n{safe_details}")
-
-    # Добавить информацию о подгруппе
-    if subgroup and action in ['add', 'subgroup_changed']:
-        subgroup_text = SUBGROUP_TEXTS.get(subgroup, f'подгруппа {escape_markdown_v2(subgroup)}')
-        if action == 'add':
-            message += f"\n\n{subgroup_text}"
-        elif action == 'subgroup_changed':
-            message = message.replace("изменена", f"изменена на {subgroup_text}")
-
-    return message
+    return messages.get(action, f"✅ Действие выполнено успешно!\n{safe_details}")
 
 
 def format_error_message(error_type: str, details: str = "") -> str:
@@ -520,13 +394,60 @@ def format_error_message(error_type: str, details: str = "") -> str:
     safe_details = escape_markdown_v2(details)
 
     errors = {
-        'time_format': f"❌ Неверный формат времени\!\nИспользуйте ЧЧ:ММ \(например: 10:30\)\n{safe_details}",
-        'missing_args': f"❌ Недостаточно аргументов\!\n{safe_details}",
-        'lesson_not_found': f"❌ Урок не найден\!\n{safe_details}",
-        'db_error': f"❌ Ошибка базы данных\!\n{safe_details}",
-        'invalid_day': f"❌ Неверный день недели\!\nИспользуйте: Понедельник, Вторник и т\.д\.\n{safe_details}",
-        'no_lessons': f"❌ Нет уроков для отображения\!\n{safe_details}",
-        'invalid_subgroup': f"❌ Неверная подгруппа\!\nИспользуйте: 1, 2 или all\n{safe_details}",
-        'unknown': f"❌ Произошла неизвестная ошибка\!\n{safe_details}"
+        'time_format': f"❌ Неверный формат времени!\nИспользуйте ЧЧ:ММ (например: 10:30)\n{safe_details}",
+        'missing_args': f"❌ Недостаточно аргументов!\n{safe_details}",
+        'lesson_not_found': f"❌ Урок не найден!\n{safe_details}",
+        'db_error': f"❌ Ошибка базы данных!\n{safe_details}",
+        'invalid_day': f"❌ Неверный день недели!\nИспользуйте: Понедельник, Вторник и т.д.\n{safe_details}",
+        'no_lessons': f"❌ Нет уроков для отображения!\n{safe_details}",
+        'invalid_subgroup': f"❌ Неверная подгруппа!\nИспользуйте: 1, 2 или all\n{safe_details}",
+        'unknown': f"❌ Произошла неизвестная ошибка!\n{safe_details}"
     }
     return errors.get(error_type, errors['unknown'])
+
+
+def format_all_lessons_message(all_lessons: list) -> str:
+    """Сообщение со всеми уроками"""
+    if not all_lessons:
+        return "📭 В базе данных нет уроков"
+
+    # Группируем по дням
+    lessons_by_day = {}
+    for lesson in all_lessons:
+        day = lesson.get('day', 'Неизвестно')
+        if day not in lessons_by_day:
+            lessons_by_day[day] = []
+        lessons_by_day[day].append(lesson)
+
+    # Сортируем дни по порядку
+    sorted_days = []
+    for day in DAYS_FULL:
+        if day in lessons_by_day:
+            sorted_days.append(day)
+    for day in lessons_by_day:
+        if day not in sorted_days:
+            sorted_days.append(day)
+
+    # Формируем сообщение
+    result = "📚 *Все уроки в базе данных:*\n\n"
+    total_lessons = 0
+
+    for day in sorted_days:
+        lessons = lessons_by_day[day]
+        total_lessons += len(lessons)
+
+        result += f"\n📅 {safe_markdown_bold(day.upper())}\n"
+
+        # Сортируем уроки по времени
+        lessons.sort(key=lambda x: x.get('time', '00:00'))
+
+        for lesson in lessons:
+            time = escape_markdown_v2(lesson.get('time', '??:??'))
+            subject = escape_markdown_v2(lesson.get('subject', 'Неизвестно'))
+            subgroup = lesson.get('subgroup', 'all')
+
+            subgroup_mark = _get_subgroup_mark(subgroup)
+            result += f"🕒 {time} - {subject}{subgroup_mark}\n"
+
+    result += f"\n📊 Всего уроков в базе: {safe_markdown_bold(str(total_lessons))}"
+    return result
