@@ -1,17 +1,13 @@
 import os
 import datetime
 import logging
-import re
 from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes, CallbackQueryHandler
 from dotenv import load_dotenv
 from database import ScheduleDatabase
 from keyboards import create_main_menu, create_confirmation_keyboard, create_day_selection_keyboard, \
     create_subgroup_selection_keyboard
-from messages import (
-    format_day_schedule, format_full_schedule_by_days, format_week_overview,
-    format_subgroup_selection_message, format_instruction_message
-)
+from messages import format_day_schedule, format_full_schedule_by_days, format_week_overview
 
 # === НАСТРОЙКА ЛОГГИРОВАНИЯ ===
 logging.getLogger("httpx").setLevel(logging.WARNING)
@@ -37,7 +33,6 @@ print("🤖 Бот с поддержкой подгрупп запущен")
 # === КОНСТАНТЫ ===
 DAYS_RU = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье']
 DAYS_ORDER = {day.lower(): idx for idx, day in enumerate(DAYS_RU)}
-CACHE_TIMEOUT = 300
 VALID_SUBGROUPS = ['1', '2', 'all']
 
 # === КЭШИРОВАНИЕ ДАННЫХ ===
@@ -71,7 +66,7 @@ def get_cached_schedule(subgroup: str = 'all'):
 
     if (cache_key not in _schedule_cache or
             _cache_timestamp is None or
-            (now - _cache_timestamp).seconds > CACHE_TIMEOUT):
+            (now - _cache_timestamp).seconds > 300):
 
         _schedule_cache[cache_key] = {}
         days = db.get_all_days_with_lessons_for_subgroup(subgroup)
@@ -126,17 +121,6 @@ def format_subgroup_text(subgroup: str) -> str:
     elif subgroup == '2':
         return "2️⃣ (подгруппа 2)"
     return f"({subgroup})"
-
-
-def time_to_minutes(time_str: str) -> int:
-    """Конвертирует время в минуты для сортировки"""
-    try:
-        if ':' in time_str:
-            hours, minutes = map(int, time_str.split(':'))
-            return hours * 60 + minutes
-        return 0
-    except (ValueError, TypeError):
-        return 0
 
 
 async def get_day_schedule_message(day_ru: str, subgroup: str, day_type: str = "сегодня") -> str:
@@ -385,29 +369,6 @@ async def delete_lesson_command(update: Update, context: ContextTypes.DEFAULT_TY
         await update.message.reply_text(r"❌ Введите правильный ID \(число\)", parse_mode='MarkdownV2')
 
 
-async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Статистика: /stats"""
-    user_id = update.effective_user.id
-    subgroup = get_user_subgroup(user_id)
-
-    stats = db.get_stats_for_subgroup(subgroup)
-
-    message = f"📊 *Статистика (подгруппа {escape_markdown_v2(subgroup)}):*\n\n"
-    message += f"• Всего уроков: *{escape_markdown_v2(str(stats['total_lessons']))}*\n"
-    message += f"• Дней с уроками: *{escape_markdown_v2(str(stats['days_with_lessons']))}*\n"
-    message += f"• Разных предметов: *{escape_markdown_v2(str(stats['subjects_count']))}*\n"
-
-    if stats.get('most_busy_day'):
-        message += f"• Самый загруженный день: *{escape_markdown_v2(stats['most_busy_day'])}*\n"
-
-    if stats.get('lessons_by_day'):
-        message += f"\n📅 *Уроков по дням:*\n"
-        for day, count in stats['lessons_by_day'].items():
-            message += f"• {escape_markdown_v2(day)}: {escape_markdown_v2(str(count))}\n"
-
-    await update.message.reply_text(message, parse_mode='MarkdownV2')
-
-
 async def week_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Расписание на всю неделю: /week"""
     user_id = update.effective_user.id
@@ -434,7 +395,7 @@ async def all_lessons_command(update: Update, context: ContextTypes.DEFAULT_TYPE
         def sort_key(lesson):
             day = lesson.get('day', '').lower()
             time_str = lesson.get('time', '00:00')
-            return (DAYS_ORDER.get(day, 99), time_to_minutes(time_str))
+            return (DAYS_ORDER.get(day, 99), datetime.datetime.strptime(time_str, '%H:%M').time() if ':' in time_str else datetime.time(0, 0))
 
         all_lessons.sort(key=sort_key)
 
@@ -472,19 +433,30 @@ async def all_lessons_command(update: Update, context: ContextTypes.DEFAULT_TYPE
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Помощь: /help"""
     help_text = (
-            HELP_MESSAGE +
-            r"\n\n🎯 *Работа с подгруппами:*\n"
-            r"• Используйте команду `/subgroup` для выбора подгруппы\n"
-            r"• Подгруппа `1` \- ваши индивидуальные уроки\n"
-            r"• Подгруппа `2` \- уроки для второй подгруппы\n"
-            r"• `all` \- общие уроки для всех\n\n"
-            r"📝 *Добавление урока с подгруппой:*\n"
-            r"`/add Математика 10:00 Понедельник 1` \- для подгруппы 1\n"
-            r"`/add Математика 10:00 Понедельник 2` \- для подгруппы 2\n"
-            r"`/add Математика 10:00 Понедельник all` \- для всех\n\n"
-            r"📊 *Просмотр статистики:* `/stats`\n"
-            r"📅 *Вся неделя:* `/week`\n"
-            r"📚 *Все уроки:* `/all`"
+        r"🆘 *Справка по командам с поддержкой подгрупп*\n\n"
+        r"🎯 *Работа с подгруппами:*\n"
+        r"/subgroup \- Выбрать подгруппу \(1, 2 или all\)\n"
+        r"🔄 Подгруппа сохраняется для каждого пользователя отдельно\n\n"
+        r"📅 *Просмотр расписания \(для выбранной подгруппы\):*\n"
+        r"/schedule \- Выбрать день недели\n"
+        r"/today \- Расписание на сегодня\n"
+        r"/tomorrow \- Расписание на завтра\n"
+        r"/week \- Вся неделя\n"
+        r"/all \- Все уроки в базе\n\n"
+        r"➕ *Добавление урока \(с указанием подгруппы\):*\n"
+        r"`/add <предмет> <время> <день> \[подгруппа\]`\n\n"
+        r"*Примеры:*\n"
+        r"• `/add Математика 10:00 Понедельник` \- для всех\n"
+        r"• `/add Математика 10:00 Понедельник 1` \- для подгруппы 1\n"
+        r"• `/add Математика 10:00 Понедельник 2` \- для подгруппы 2\n"
+        r"• `/add Математика 10:00 Понедельник all` \- для всех подгрупп\n\n"
+        r"🗑️ *Удаление:*\n"
+        r"/delete <ID\_урока> \- Удалить урок\n\n"
+        r"💡 *Советы:*\n"
+        r"• Используйте кнопки для быстрого доступа\n"
+        r"• ID урока можно увидеть в расписании\n"
+        r"• Подгруппа: 1, 2 или all \(для всех\)\n"
+        r"• Дни: Понедельник\-Воскресенье"
     )
     await update.message.reply_text(help_text, parse_mode='MarkdownV2')
 
@@ -517,7 +489,6 @@ def main():
         ("help", help_command),
         ("add", add_lesson_command),
         ("delete", delete_lesson_command),
-        ("stats", stats_command),
         ("clearcache", clear_cache_command),
     ]
 
