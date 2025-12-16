@@ -6,7 +6,7 @@ DAYS_FULL = ["Понедельник", "Вторник", "Среда", "Четв
 
 # === ОСНОВНЫЕ КЛАВИАТУРЫ ===
 def create_main_menu(subgroup: str = '1') -> ReplyKeyboardMarkup:
-    """Главное меню бота"""
+    """Главное меню бота - ОБЫЧНАЯ КЛАВИАТУРА"""
     menu = [
         ["📅 Сегодня", "📅 Завтра"],
         ["📋 Вся неделя", "➕ Добавить урок"],
@@ -17,37 +17,34 @@ def create_main_menu(subgroup: str = '1') -> ReplyKeyboardMarkup:
 
 
 def create_subgroup_selection_keyboard(current_subgroup: str = '1') -> InlineKeyboardMarkup:
-    """Выбор подгруппы"""
-
-    def _subgroup_button(subgroup: str, text: str) -> InlineKeyboardButton:
-        if subgroup == current_subgroup:
-            text += " ✅"
-        return InlineKeyboardButton(text, callback_data=f"subgroup_{subgroup}")
-
+    """Выбор подгруппы - INLINE КЛАВИАТУРА"""
     keyboard = [
-        [_subgroup_button('1', "🎯 Подгруппа 1"), _subgroup_button('2', "🎯 Подгруппа 2")],
-        [_subgroup_button('all', "👥 Для всех")],
+        [
+            InlineKeyboardButton("🎯 Подгруппа 1" + (" ✅" if current_subgroup == '1' else ""),
+                                 callback_data="subgroup_1"),
+            InlineKeyboardButton("🎯 Подгруппа 2" + (" ✅" if current_subgroup == '2' else ""),
+                                 callback_data="subgroup_2")
+        ],
+        [InlineKeyboardButton("👥 Для всех" + (" ✅" if current_subgroup == 'all' else ""),
+                              callback_data="subgroup_all")],
         [InlineKeyboardButton("❌ Отмена", callback_data="cancel")]
     ]
     return InlineKeyboardMarkup(keyboard)
 
 
 def create_day_selection_keyboard(subgroup: str = '1') -> InlineKeyboardMarkup:
-    """Клавиатура для выбора дня недели"""
+    """Клавиатура для выбора дня недели - INLINE КЛАВИАТУРА"""
+    # Создаем кнопки дней
+    keyboard = []
+    for i in range(0, len(DAYS_FULL), 3):
+        row = []
+        for day in DAYS_FULL[i:i + 3]:
+            row.append(InlineKeyboardButton(day, callback_data=f"day_{day}_{subgroup}"))
+        keyboard.append(row)
 
-    def _day_button(day: str) -> InlineKeyboardButton:
-        return InlineKeyboardButton(day, callback_data=f"day_{day}_{subgroup}")
-
-    # 7 дней недели + "Вся неделя"
-    keyboard = [
-        [_day_button(DAYS_FULL[0]), _day_button(DAYS_FULL[1]), _day_button(DAYS_FULL[2])],
-        [_day_button(DAYS_FULL[3]), _day_button(DAYS_FULL[4]), _day_button(DAYS_FULL[5])],
-        [_day_button(DAYS_FULL[6]), InlineKeyboardButton("📋 Вся неделя", callback_data=f"day_Вся неделя_{subgroup}")]
-    ]
-
-    # Нижний ряд
+    # Добавляем кнопку "Вся неделя" и отмены
     keyboard.append([
-        InlineKeyboardButton(f"🎯 Подгр. {subgroup}", callback_data="change_subgroup"),
+        InlineKeyboardButton("📋 Вся неделя", callback_data=f"day_Вся неделя_{subgroup}"),
         InlineKeyboardButton("❌ Отмена", callback_data="cancel")
     ])
 
@@ -55,7 +52,7 @@ def create_day_selection_keyboard(subgroup: str = '1') -> InlineKeyboardMarkup:
 
 
 def create_confirmation_keyboard(lesson_id: int) -> InlineKeyboardMarkup:
-    """Клавиатура подтверждения удаления"""
+    """Клавиатура подтверждения удаления - INLINE КЛАВИАТУРА"""
     keyboard = [[
         InlineKeyboardButton("✅ Да, удалить", callback_data=f"confirm_delete_{lesson_id}"),
         InlineKeyboardButton("❌ Нет, оставить", callback_data="cancel_delete")

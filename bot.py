@@ -240,108 +240,43 @@ async def tomorrow_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработка inline-кнопок"""
+    """Обработка inline-кнопок - УПРОЩЕННАЯ ВЕРСИЯ"""
     try:
         query = update.callback_query
         await query.answer()
+
+        # Получаем данные
         user_id = query.from_user.id
+        callback_data = query.data
 
-        print(f"🔘 Нажата кнопка: callback_data='{query.data}', user_id={user_id}")
+        print(f"🎯 КНОПКА НАЖАТА: user_id={user_id}, callback_data='{callback_data}'")
 
-        # Обработка выбора подгруппы
-        if query.data.startswith('subgroup_'):
-            subgroup = query.data.replace('subgroup_', '')
-            if subgroup in VALID_SUBGROUPS:
+        # Простой ответ для ВСЕХ кнопок
+        response = f"✅ Нажата кнопка: {callback_data}"
+
+        if callback_data.startswith('subgroup_'):
+            subgroup = callback_data.replace('subgroup_', '')
+            if subgroup in ['1', '2', 'all']:
                 set_user_subgroup(user_id, subgroup)
-                keyboard = create_main_menu(subgroup)
-                await query.edit_message_text(
-                    text=f"✅ Выбрана подгруппа: 🎯 {escape_markdown_v2(subgroup)}\n\nТеперь вы будете видеть уроки для этой подгруппы\\.",
-                    parse_mode='MarkdownV2',
-                    reply_markup=keyboard
-                )
-            return
+                response = f"✅ Выбрана подгруппа: {subgroup}"
 
-        # Обработка кнопок удаления
-        if query.data.startswith('confirm_delete_'):
-            try:
-                lesson_id = int(query.data.split('_')[-1])
-                lesson = db.get_lesson_by_id(lesson_id)
-
-                if lesson:
-                    success = db.delete_lesson(lesson_id)
-                    if success:
-                        clear_schedule_cache()
-                        message = r"✅ Урок удален\!\n\n"
-                        message += f"• Предмет: {escape_markdown_v2(lesson.get('subject', 'Неизвестно'))}\n"
-                        if lesson.get('subgroup') != 'all':
-                            message += f"• Подгруппа: {escape_markdown_v2(lesson.get('subgroup'))}\n"
-                        message += f"• Время: {escape_markdown_v2(lesson.get('time', 'Неизвестно'))}\n"
-                        message += f"• День: {escape_markdown_v2(lesson.get('day', 'Неизвестно'))}"
-                    else:
-                        message = "❌ Ошибка при удалении урока"
-                else:
-                    message = "❌ Урок не найден"
-
-                await query.edit_message_text(text=message, parse_mode='MarkdownV2')
-            except (ValueError, IndexError):
-                await query.edit_message_text("❌ Ошибка: некорректный ID урока", parse_mode='MarkdownV2')
-            return
-
-        # Обработка кнопок выбора дня
-        if query.data.startswith('day_'):
-            parts = query.data.split('_')
-            print(f"   DEBUG parts: {parts}")
-
-            if len(parts) >= 3:
-                # Формат: day_Понедельник_1
+        elif callback_data.startswith('day_'):
+            parts = callback_data.split('_')
+            if len(parts) >= 2:
                 day = parts[1]
-                subgroup = parts[2]
-            elif len(parts) == 2:
-                # Формат: day_Понедельник
-                day = parts[1]
-                subgroup = get_user_subgroup(user_id)
-            else:
-                day = "Понедельник"
-                subgroup = get_user_subgroup(user_id)
+                subgroup = parts[2] if len(parts) > 2 else '1'
+                response = f"📅 Выбран день: {day}\n🎯 Подгруппа: {subgroup}"
 
-            print(f"   DEBUG: day='{day}', subgroup='{subgroup}'")
+        elif callback_data.startswith('confirm_delete_'):
+            lesson_id = callback_data.replace('confirm_delete_', '')
+            response = f"🗑️ Удаление урока с ID: {lesson_id}"
 
-            cached_data = get_cached_schedule(subgroup)
+        elif callback_data in ['cancel', 'cancel_delete']:
+            response = "❌ Действие отменено"
 
-            if day == 'Вся неделя':
-                message = format_full_schedule_by_days(cached_data)
-                message += f"\n\n🎯 *Подгруппа: {escape_markdown_v2(subgroup)}*"
-            else:
-                lessons = cached_data.get(day, [])
-                message = format_day_schedule(day, lessons)
-                message += f"\n\n🎯 *Подгруппа: {escape_markdown_v2(subgroup)}*"
-
-            await query.edit_message_text(text=message, parse_mode='MarkdownV2')
-            return
-
-        # Обработка кнопки смены подгруппы
-        if query.data == 'change_subgroup':
-            current_subgroup = get_user_subgroup(user_id)
-            keyboard = create_subgroup_selection_keyboard(current_subgroup)
-            await query.edit_message_text(
-                text="🎯 *Выберите подгруппу:*",
-                parse_mode='MarkdownV2',
-                reply_markup=keyboard
-            )
-            return
-
-        # Обработка кнопки отмены
-        if query.data in ['cancel_delete', 'cancel', 'cancel_subgroup']:
-            await query.edit_message_text(
-                text="❌ Действие отменено",
-                parse_mode='MarkdownV2'
-            )
-            return
-
-        # Если callback_data не распознан
-        print(f"⚠️ Неизвестный callback_data: '{query.data}'")
+        # Отправляем ответ
         await query.edit_message_text(
-            text="❌ Эта кнопка пока не работает",
+            text=response,
             parse_mode='MarkdownV2'
         )
 
@@ -557,6 +492,27 @@ async def clear_cache_command(update: Update, context: ContextTypes.DEFAULT_TYPE
         traceback.print_exc()
 
 
+async def test_buttons_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Тестовая команда для проверки кнопок"""
+    try:
+        user_id = update.effective_user.id
+        subgroup = get_user_subgroup(user_id)
+
+        # Создаем тестовую клавиатуру с ОДНОЙ кнопкой
+        keyboard = InlineKeyboardMarkup([[
+            InlineKeyboardButton("🎯 Тестовая кнопка", callback_data="test_button")
+        ]])
+
+        await update.message.reply_text(
+            "🔄 Тест кнопок\n\nНажмите на кнопку ниже:",
+            reply_markup=keyboard
+        )
+
+    except Exception as e:
+        print(f"❌ ОШИБКА в test_buttons_command: {e}")
+        import traceback
+        traceback.print_exc()
+
 def main():
     """Запуск бота"""
     try:
@@ -597,6 +553,7 @@ def main():
             ("add", add_lesson_command),
             ("delete", delete_lesson_command),
             ("clearcache", clear_cache_command),
+            ("test", test_buttons_command)
         ]
 
         for command, handler in commands:
