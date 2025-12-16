@@ -17,7 +17,7 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("telegram").setLevel(logging.WARNING)
 logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s',
-    level=logging.WARNING,
+    level=logging.INFO,  # Изменил на INFO для лучшей отладки
     datefmt='%H:%M:%S'
 )
 
@@ -35,6 +35,7 @@ print("🤖 Бот с поддержкой подгрупп запущен")
 
 # === КОНСТАНТЫ ===
 DAYS_RU = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье']
+DAYS_ORDER = {day.lower(): idx for idx, day in enumerate(DAYS_RU)}
 CACHE_TIMEOUT = 300
 VALID_SUBGROUPS = ['1', '2', 'all']
 
@@ -111,6 +112,17 @@ def format_subgroup_text(subgroup: str) -> str:
     elif subgroup == '2':
         return "2️⃣ (подгруппа 2)"
     return f"({subgroup})"
+
+
+def time_to_minutes(time_str: str) -> int:
+    """Конвертирует время в минуты для сортировки"""
+    try:
+        if ':' in time_str:
+            hours, minutes = map(int, time_str.split(':'))
+            return hours * 60 + minutes
+        return 0
+    except (ValueError, TypeError):
+        return 0
 
 
 async def get_day_schedule_message(day_ru: str, subgroup: str, day_type: str = "сегодня") -> str:
@@ -397,31 +409,47 @@ async def week_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def all_lessons_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Вывод всех уроков подряд: /all"""
     try:
+        # Получаем все уроки из базы
         all_lessons = db.get_all_lessons()
 
         if not all_lessons:
             await update.message.reply_text("📭 В базе данных нет уроков")
             return
 
-        days_order = DAYS_RU[:6]  # Без воскресенья
-        all_lessons.sort(key=lambda x: (
-            days_order.index(x["day"]) if x["day"] in days_order else 999,
-            x["time"]
-        ))
+        # Сортируем уроки по дню и времени
+        def sort_key(lesson):
+            day = lesson.get('day', '').lower()
+            time_str = lesson.get('time', '00:00')
+            return (DAYS_ORDER.get(day, 99), time_to_minutes(time_str))
 
+        all_lessons.sort(key=sort_key)
+
+        # Формируем сообщение
         result = "📚 *Все уроки в базе данных:*\n\n"
         current_day = None
 
         for lesson in all_lessons:
-            if lesson['day'] != current_day:
-                result += f"\n*{lesson['day'].upper()}*\n"
-                current_day = lesson['day']
+            day = lesson.get('day', 'Неизвестно')
+            time = lesson.get('time', '??:??')
+            subject = lesson.get('subject', 'Неизвестно')
+            subgroup = lesson.get('subgroup', 'all')
 
-            result += f"🕒 {lesson['time']} - {lesson['subject']} {format_subgroup_text(lesson.get('subgroup', 'all'))}\n"
+            if day != current_day:
+                result += f"\n*{day.upper()}*\n"
+                current_day = day
+
+            result += f"🕒 {time} - {subject} {format_subgroup_text(subgroup)}\n"
 
         result += f"\n📊 Всего уроков в базе: *{len(all_lessons)}*"
         await update.message.reply_text(result, parse_mode='Markdown')
 
+    except AttributeError as e:
+        logging.error(f"Ошибка в all_lessons_command: {e}")
+        await update.message.reply_text(
+            "❌ Ошибка: метод get_all_lessons() не найден в базе данных.\n"
+            "Проверьте файл database.py",
+            parse_mode='Markdown'
+        )
     except Exception as e:
         logging.error(f"Ошибка в all_lessons_command: {e}")
         await update.message.reply_text(f"❌ Ошибка при получении уроков: {str(e)}")
@@ -503,7 +531,7 @@ def main():
     except KeyboardInterrupt:
         print("\n👋 Бот остановлен")
     except Exception as e:
-        logging.error(f"Ошибка: {e}")
+        logging.error(f"Ошибка при запуске бота: {e}")
 
 
 if __name__ == "__main__":
