@@ -9,8 +9,8 @@ from database import ScheduleDatabase
 from keyboards import create_main_menu, create_confirmation_keyboard, create_day_selection_keyboard, \
     create_subgroup_selection_keyboard
 from messages import (
-    WELCOME_MESSAGE, HELP_MESSAGE,
-    format_day_schedule, format_full_schedule_by_days, format_week_overview
+    format_day_schedule, format_full_schedule_by_days, format_week_overview,
+    format_subgroup_selection_message, format_instruction_message
 )
 
 # === НАСТРОЙКА ЛОГГИРОВАНИЯ ===
