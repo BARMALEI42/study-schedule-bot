@@ -648,19 +648,14 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 def main():
     """Запуск бота"""
-    application.add_handler(MessageHandler(
-        filters.TEXT & ~filters.COMMAND,  # Все текстовые сообщения, кроме команд
-        handle_text_message
-    ))
     try:
-
         print("🚀 Запуск бота с поддержкой подгрупп...")
         print(f"📱 Токен: {TOKEN[:10]}...")
 
         db.migrate_to_subgroups()
         print("✅ База данных обновлена для поддержки подгрупп")
 
-        application = Application.builder().token(TOKEN).build()
+        application = Application.builder().token(TOKEN).build()  # ← СОЗДАНИЕ application
 
         # === ГЛОБАЛЬНЫЙ ОБРАБОТЧИК ОШИБОК ===
         async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -723,6 +718,12 @@ def main():
             confirm_delete_command
         ))
 
+        # ✅ ПРАВИЛЬНОЕ МЕСТО для обработчика текстовых сообщений
+        application.add_handler(MessageHandler(
+            filters.TEXT & ~filters.COMMAND,  # Все текстовые сообщения, кроме команд
+            handle_text_message
+        ))
+
         print("✅ Бот настроен со следующими командами:")
         for cmd, _ in all_commands:
             print(f"   • /{cmd}")
@@ -744,7 +745,6 @@ def main():
         print(f"❌ Критическая ошибка при запуске бота: {e}")
         import traceback
         traceback.print_exc()
-
 
 if __name__ == "__main__":
     main()
