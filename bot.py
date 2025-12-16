@@ -639,13 +639,13 @@ def main():
 
         # Регистрация команд ДНЕЙ
         day_commands = [
-            ("day_понедельник", day_monday_command),
-            ("day_вторник", day_tuesday_command),
-            ("day_среда", day_wednesday_command),
-            ("day_четверг", day_thursday_command),
-            ("day_пятница", day_friday_command),
-            ("day_суббота", day_saturday_command),
-            ("day_воскресенье", day_sunday_command),
+            ("day_monday", day_monday_command),  
+            ("day_tuesday", day_tuesday_command),
+            ("day_wednesday", day_wednesday_command),
+            ("day_thursday", day_thursday_command),
+            ("day_friday", day_friday_command),
+            ("day_saturday", day_saturday_command),
+            ("day_sunday", day_sunday_command),
         ]
 
         # Регистрация команд ПОДГРУПП
@@ -658,7 +658,7 @@ def main():
         # Регистрируем все статические команды
         all_commands = basic_commands + day_commands + subgroup_commands
         for command, handler in all_commands:
-            application.add_handler(CommandHandler("day_monday", handler))
+            application.add_handler(CommandHandler(command, handler))
 
         # Регистрируем динамические команды (confirm_delete_*)
         application.add_handler(MessageHandler(
